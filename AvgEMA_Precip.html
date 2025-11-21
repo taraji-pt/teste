@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<title>Precipitação Duas Estações + Gráfico da Média</title>
+
+<style>
+    /* Caixa do título */
+    .titulo-box {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        background-color: #002b55; /* azul escuro Proteção Civil */
+        color: #ff8c00;            /* laranja Proteção Civil */
+        padding: 15px;
+        border-radius: 12px;
+        margin-bottom: 15px;
+        width: fit-content;
+    }
+
+    .titulo-box img {
+        width: 70px;
+        height: 70px;
+    }
+
+    table { border-collapse: collapse; margin-top: 20px; }
+    td, th { border: 1px solid #999; padding: 6px 12px; text-align: center; }
+    th { background: #eee; }
+
+    /* Créditos no fundo */
+    .creditos {
+        margin-top: 40px;
+        font-size: 14px;
+        color: #444;
+        text-align: center;
+        opacity: 0.8;
+    }
+</style>
+
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+</head>
+<body>
+
+    <!-- TÍTULO EM CAIXA ESTILIZADA -->
+    <div class="titulo-box">
+        <img src="https://i.imgur.com/I2YN7vR.png">
+        <h2 style="margin: 0;">Precipitação acumulada — Estações 5210758 e 1210766</h2>
+    </div>
+
+    <!-- DESCRIÇÃO LOGO APÓS O TÍTULO -->
+    <p>
+        Os valores na 
+        <a href="https://api.ipma.pt/open-data/observation/meteorology/stations/observations.json" 
+           target="_blank"><strong>fonte</strong></a> correspondem à 
+        <strong>precipitação acumulada por hora</strong>, medida a 1,5 metros de altura em cada 
+        estação meteorológica do IPMA.  
+        A tabela e o gráfico mostram a <strong>soma diária</strong> dessa precipitação para cada 
+        estação e a <strong>média diária</strong> entre as duas estações selecionadas.
+    </p>
+
+    <div id="output"></div>
+
+    <h3>Gráfico diário — Média das duas estações</h3>
+    <canvas id="graficoMedia" width="600" height="250"></canvas>
+
+
+
+<script>
+const URL_IPMA = "https://api.ipma.pt/open-data/observation/meteorology/stations/observations.json";
+
+const ESTACAO_A = "5210758";
+const ESTACAO_B = "1210766";
+
+let chart; // referência ao gráfico para atualizar se necessário
+
+async function lerDados() {
+    try {
+        const resp = await fetch(URL_IPMA);
+        const dados = await resp.json();
+
+        for (let timestamp in dados) {
+            const estA = dados[timestamp][ESTACAO_A];
+            const estB = dados[timestamp][ESTACAO_B];
+
+            if (estA) registar("A", timestamp, estA.precAcumulada);
+            if (estB) registar("B", timestamp, estB.precAcumulada);
+        }
+
+        desenharTabelaEGrafico();
+
+    } catch (err) {
+        console.error("Erro ao ler dados:", err);
+    }
+}
+
+function registar(estacao, timestamp, prec) {
+    if (prec === -99.0) return;
+
+    let hist = JSON.parse(localStorage.getItem("prec_duas_estacoes")) || {};
+
+    if (!hist[timestamp]) hist[timestamp] = {};
+
+    if (hist[timestamp][estacao] == null) {
+        hist[timestamp][estacao] = prec;
+    }
+
+    localStorage.setItem("prec_duas_estacoes", JSON.stringify(hist));
+}
+
+function desenharTabelaEGrafico() {
+    const hist = JSON.parse(localStorage.getItem("prec_duas_estacoes")) || {};
+    let dias = {};
+
+    for (let timestamp in hist) {
+        let dia = timestamp.substring(0, 10);
+
+        if (!dias[dia]) dias[dia] = { A: 0, B: 0 };
+
+        if (hist[timestamp].A != null) dias[dia].A += hist[timestamp].A;
+        if (hist[timestamp].B != null) dias[dia].B += hist[timestamp].B;
+    }
+
+    let html = "<table>";
+    html += "<tr><th>Dia</th><th>Alcochete</th><th>Barreiro</th><th>Média</th></tr>";
+
+    let labels = [];
+    let medias = [];
+
+    Object.keys(dias).sort().forEach(dia => {
+        const a = dias[dia].A;
+        const b = dias[dia].B;
+        const media = (a + b) / 2;
+
+        labels.push(dia);
+        medias.push(media);
+
+        html += `
+            <tr>
+                <td>${dia}</td>
+                <td>${a.toFixed(2)} mm</td>
+                <td>${b.toFixed(2)} mm</td>
+                <td>${media.toFixed(2)} mm</td>
+            </tr>
+        `;
+    });
+
+    html += "</table>";
+    document.getElementById("output").innerHTML = html;
+
+    desenharGrafico(labels, medias);
+}
+
+function desenharGrafico(labels, medias) {
+    const mediasFiltradas = medias.map(v => v < 0 ? 0 : v);
+
+    const ctx = document.getElementById("graficoMedia").getContext("2d");
+
+    if (chart) chart.destroy();
+
+    chart = new Chart(ctx, {
+        type: "line",
+        data: {
+            labels: labels,
+            datasets: [{
+                label: "Média diária das 2 estações (mm)",
+                data: mediasFiltradas,
+                fill: false,
+                tension: 0.2
+            }]
+        },
+        options: {
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+}
+
+// Atualizar de hora a hora
+setInterval(lerDados, 60 * 60 * 1000);
+
+// Corre ao abrir
+lerDados();
+</script>
+
+<!-- CRÉDITOS NO FUNDO -->
+<div class="creditos">
+    SMPC Montijo | Tiago Terraquente (2025)
+</div>
+
+</body>
+</html>
