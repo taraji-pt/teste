@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>EV Bet Calculator</title>
+  <style>
+    body {
+      font-family: "Inter", Arial, sans-serif;
+      background: #f4f6f8;
+      display: flex;
+      justify-content: center;
+      padding: 40px;
+    }
+    .card {
+      background: #ffffff;
+      width: 420px;
+      padding: 30px;
+      border-radius: 16px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+      animation: fadeIn 0.3s ease-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    h2 {
+      text-align: center;
+      margin-bottom: 20px;
+      font-size: 24px;
+      color: #222;
+    }
+    label {
+      font-weight: 600;
+      color: #333;
+    }
+    input {
+      width: 100%;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid #ccd1d7;
+      margin: 6px 0 16px 0;
+      font-size: 15px;
+      transition: 0.2s;
+    }
+    input:focus {
+      border-color: #4a8bff;
+      box-shadow: 0 0 0 3px rgba(74,139,255,0.25);
+      outline: none;
+    }
+    button {
+      padding: 14px;
+      width: 100%;
+      font-size: 16px;
+      cursor: pointer;
+      background: #4a8bff;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-weight: 600;
+      transition: 0.2s;
+    }
+    button:hover {
+      background: #1f6dff;
+    }
+    #result {
+      margin-top: 25px;
+      font-size: 18px;
+      font-weight: 600;
+      text-align: center;
+      padding: 15px;
+      border-radius: 12px;
+      background: #f7f9fb;
+      border: 1px solid #dce2e8;
+    }
+  </style>
+</head>
+<body>
+
+<div class="card">
+<h2>Bet Decision Calculator</h2>
+
+<label>Vote %</label>
+<input type="number" id="vote" min="0" max="100" step="0.1" placeholder="e.g. 62.5" />
+
+<label>Odd</label>
+<input type="number" id="odd" min="1.01" step="0.01" placeholder="e.g. 2.40" />
+
+<button onclick="calc()">Calculate</button>
+
+<div id="result"></div>
+</div>
+
+<script>
+function calc() {
+  const vote = parseFloat(document.getElementById('vote').value) / 100;
+  const odd = parseFloat(document.getElementById('odd').value);
+  const resultDiv = document.getElementById('result');
+
+  if (!vote || !odd) {
+    resultDiv.innerHTML = "Invalid input";
+    return;
+  }
+
+  const EV = vote * odd - 1;
+  const f_full = EV / (odd - 1);
+
+  if (EV < 0.05 || f_full < 0.05) {
+    resultDiv.innerHTML = "NO BET ✘";
+    return;
+  }
+
+  let units = 0;
+  if (EV >= 0.20) units = 1.00;
+  else if (EV >= 0.12) units = 0.75;
+  else if (EV >= 0.08) units = 0.50;
+  else units = 0.25;
+
+  if (f_full >= 0.5) units = 1.0;
+
+  resultDiv.innerHTML = `BET ✔<br><br>${units.toFixed(2)} units<br><br>EV: ${EV.toFixed(3)}<br>Full Kelly: ${f_full.toFixed(3)}`;
+}
+</script>
+
+</body>
+</html>
