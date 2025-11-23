@@ -1,123 +1,117 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>EV Bet Calculator</title>
-  <style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>EV‑Based Bet Sizing Calculator</title>
+<style>
     body {
-      font-family: "Inter", Arial, sans-serif;
-      background: #f4f6f8;
-      display: flex;
-      justify-content: center;
-      padding: 40px;
+        font-family: Arial, sans-serif;
+        background: #f3f4f6;
+        margin: 0;
+        padding: 40px;
+        display: flex;
+        justify-content: center;
     }
     .card {
-      background: #ffffff;
-      width: 420px;
-      padding: 30px;
-      border-radius: 16px;
-      box-shadow: 0 8px 20px rgba(0,0,0,0.08);
-      animation: fadeIn 0.3s ease-out;
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
+        background: #ffffff;
+        padding: 30px;
+        border-radius: 16px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+        width: 100%;
+        max-width: 480px;
     }
     h2 {
-      text-align: center;
-      margin-bottom: 20px;
-      font-size: 24px;
-      color: #222;
+        text-align: center;
+        margin-top: 0;
+        color: #111827;
     }
     label {
-      font-weight: 600;
-      color: #333;
+        font-weight: 600;
+        display: block;
+        margin-top: 18px;
+        color: #374151;
     }
     input {
-      width: 100%;
-      padding: 12px;
-      border-radius: 8px;
-      border: 1px solid #ccd1d7;
-      margin: 6px 0 16px 0;
-      font-size: 15px;
-      transition: 0.2s;
-    }
-    input:focus {
-      border-color: #4a8bff;
-      box-shadow: 0 0 0 3px rgba(74,139,255,0.25);
-      outline: none;
+        width: 100%;
+        padding: 12px;
+        margin-top: 6px;
+        border: 1px solid #d1d5db;
+        border-radius: 10px;
+        font-size: 16px;
     }
     button {
-      padding: 14px;
-      width: 100%;
-      font-size: 16px;
-      cursor: pointer;
-      background: #4a8bff;
-      color: white;
-      border: none;
-      border-radius: 10px;
-      font-weight: 600;
-      transition: 0.2s;
+        width: 100%;
+        margin-top: 26px;
+        padding: 14px;
+        border: none;
+        border-radius: 12px;
+        background: #2563eb;
+        color: white;
+        font-size: 17px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: 0.2s;
     }
-    button:hover {
-      background: #1f6dff;
+    button:hover { background: #1e4fcc; }
+
+    .result {
+        margin-top: 28px;
+        background: #f9fafb;
+        padding: 18px;
+        border-radius: 12px;
+        border: 1px solid #e5e7eb;
+        font-size: 17px;
+        color: #111827;
     }
-    #result {
-      margin-top: 25px;
-      font-size: 18px;
-      font-weight: 600;
-      text-align: center;
-      padding: 15px;
-      border-radius: 12px;
-      background: #f7f9fb;
-      border: 1px solid #dce2e8;
-    }
-  </style>
+</style>
 </head>
 <body>
-
 <div class="card">
-<h2>Bet Decision Calculator</h2>
+    <h2>EV‑Based Bet Sizing</h2>
 
-<label>Vote %</label>
-<input type="number" id="vote" min="0" max="100" step="0.1" placeholder="e.g. 62.5" />
+    <label>Vote %</label>
+    <input id="vote" type="number" placeholder="e.g. 63" />
 
-<label>Odd</label>
-<input type="number" id="odd" min="1.01" step="0.01" placeholder="e.g. 2.40" />
+    <label>Odds</label>
+    <input id="odds" type="number" step="0.01" placeholder="e.g. 1.85" />
 
-<button onclick="calc()">Calculate</button>
+    <button onclick="calc()">Calculate</button>
 
-<div id="result"></div>
+    <div id="output" class="result" style="display:none"></div>
 </div>
 
 <script>
 function calc() {
-  const vote = parseFloat(document.getElementById('vote').value) / 100;
-  const odd = parseFloat(document.getElementById('odd').value);
-  const resultDiv = document.getElementById('result');
+    const v = parseFloat(document.getElementById('vote').value);
+    const o = parseFloat(document.getElementById('odds').value);
 
-  if (!vote || !odd) {
-    resultDiv.innerHTML = "Invalid input";
-    return;
-  }
+    if (isNaN(v) || isNaN(o)) return;
 
-  const EV = vote * odd - 1;
-  const f_full = EV / (odd - 1);
+    // --- Probability calibration model (your formula) ---
+    const p = 0.209 + 0.00542 * v;
 
-  if (EV < 0.05 || f_full < 0.05) {
-    resultDiv.innerHTML = "NO BET ✘";
-    return;
-  }
+    // --- EV calculation ---
+    const EV = p * (o - 1) - (1 - p);
 
-  let units = 0;
-  if (EV >= 0.20) units = 1.00;
-  else if (EV >= 0.12) units = 0.75;
-  else if (EV >= 0.08) units = 0.50;
-  else units = 0.25;
+    // --- Full Kelly ---
+    const k = (p * (o - 1) - (1 - p)) / (o - 1);
 
-  if (f_full >= 0.5) units = 1.0;
+    // --- Gate rule (your new logic) ---
+    const pass = EV >= 0.10;
 
-  resultDiv.innerHTML = `BET ✔<br><br>${units.toFixed(2)} units<br><br>EV: ${EV.toFixed(3)}<br>Full Kelly: ${f_full.toFixed(3)}`;
+    // --- Stake suggestion ---
+    let stake = pass ? Math.max(0.05, Math.min(k, 0.25)) : 0;
+    stake = Math.round(stake * 100) / 100;
+
+    document.getElementById('output').style.display = 'block';
+    document.getElementById('output').innerHTML = `
+        <strong>Calibrated p:</strong> ${(p*100).toFixed(1)}%<br>
+        <strong>EV:</strong> ${EV.toFixed(3)}<br>
+        <strong>Full Kelly:</strong> ${k.toFixed(3)}<br><br>
+        <strong>Gate (EV ≥ 0.10):</strong> ${pass ? '✔ Pass' : '✖ Block'}<br><br>
+        <strong>Suggested Stake:</strong> ${stake} units
+    `;
 }
 </script>
 
