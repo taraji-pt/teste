@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>EV‑Based Bet Sizing Calculator</title>
+<title>EV‑Based Bet Sizing Calculator (SofaScore)</title>
 <style>
     body {
         font-family: Arial, sans-serif;
@@ -101,7 +101,7 @@ function calc() {
     const pass = EV >= 0.10;
 
     // --- Stake suggestion ---
-    let stake = pass ? Math.max(0.05, Math.min(k, 0.25)) : 0;
+    let stake = pass ? Math.max(0.25, Math.min(k, 1)) : 0;;
     stake = Math.round(stake * 100) / 100;
 
     document.getElementById('output').style.display = 'block';
@@ -110,7 +110,7 @@ function calc() {
         <strong>EV:</strong> ${EV.toFixed(3)}<br>
         <strong>Full Kelly:</strong> ${k.toFixed(3)}<br><br>
         <strong>Gate (EV ≥ 0.10):</strong> ${pass ? '✔ Pass' : '✖ Block'}<br><br>
-        <strong>Suggested Stake:</strong> ${stake} units
+        <strong>Suggested Stake (updated range):</strong> ${stake} units
     `;
 }
 </script>
