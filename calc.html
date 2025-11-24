@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>EV‑Based Bet Calc</title>
+<title>SofaScore Calculator</title>
 <style>
     body {
         font-family: Arial, sans-serif;
@@ -68,7 +68,7 @@
 </head>
 <body>
 <div class="card">
-    <h2>EV‑Based Bet Sizing</h2>
+    <h2>EV‑Based Betting SofaScore</h2>
 
     <label>Vote %</label>
     <input id="vote" type="number" placeholder="e.g. 63" />
@@ -101,7 +101,13 @@ function calc() {
     const pass = EV >= 0.10;
 
     // --- Stake suggestion ---
-    let stake = pass ? Math.max(0.25, Math.min(k, 1)) : 0;;
+    let stake = 0;
+    if (pass) {
+        if (EV >= 0.25) stake = 1;
+        else if (EV >= 0.20) stake = 0.75;
+        else if (EV >= 0.15) stake = 0.50;
+        else stake = 0.25;
+    };
     stake = Math.round(stake * 100) / 100;
 
     document.getElementById('output').style.display = 'block';
