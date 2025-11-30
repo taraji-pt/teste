@@ -1,124 +1,325 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Calculadora de Apostas Profissional</title>
-<style>
-  body { font-family: Arial, sans-serif; padding: 20px; max-width: 650px; margin: auto; background: #f5f5f5; }
-  h2 { text-align: center; }
-  input, button { padding: 5px; margin: 5px 0; width: 100%; }
-  label { display: block; margin-top: 10px; }
-  .resultado { margin-top: 20px; padding: 15px; border-radius: 10px; font-weight: bold; }
-  .zona1 { background: #4CAF50; color: white; padding: 5px; border-radius: 5px; }
-  .zona2 { background: #8BC34A; color: white; padding: 5px; border-radius: 5px; }
-  .zona3 { background: #FFC107; color: black; padding: 5px; border-radius: 5px; }
-  .zona4 { background: #FF9800; color: white; padding: 5px; border-radius: 5px; }
-  .zona5 { background: #F44336; color: white; padding: 5px; border-radius: 5px; }
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Central de Apostas Pessoal</title>
+  <style>
+    :root{font-family:system-ui,-apple-system,Segoe UI,Roboto,'Helvetica Neue',Arial;}
+    body{max-width:1100px;margin:18px auto;padding:18px;line-height:1.4;color:#111}
+    header{display:grid;gap:12px;border-radius:10px;padding:14px;background:#f7f7fb;border:1px solid #e2e2ee}
+    h1{margin:0 0 4px;font-size:20px}
+    .row{display:flex;gap:10px;align-items:center}
+    label{font-size:13px;color:#333}
+    input[type=number], input[type=text], select{padding:8px;border-radius:8px;border:1px solid #cfcfd9;min-width:120px}
+    .small{min-width:90px}
+    .muted{font-size:13px;color:#666}
+    .calcBox{display:flex;gap:12px;flex-wrap:wrap}
+    .pill{background:#fff;padding:10px;border-radius:8px;border:1px solid #e6e6ee;min-width:220px}
+    button{padding:8px 12px;border-radius:8px;border:1px solid #999;background:#fff;cursor:pointer}
+    table{width:100%;border-collapse:collapse;margin-top:12px}
+    th,td{padding:8px;border-bottom:1px solid #eee;text-align:left;font-size:14px}
+    th{background:#fafafa}
+    .controls{display:flex;gap:8px;align-items:center}
+    .right{margin-left:auto}
+    .positive{color:green;font-weight:700}
+    .negative{color:crimson;font-weight:700}
+    .neutral{color:#666}
+    .tiny{font-size:12px;color:#666}
+    .actions{display:flex;gap:8px}
+    .note{font-size:13px;color:#444;margin-top:6px}
+    .export{margin-top:10px}
+  </style>
 </head>
 <body>
+  <header>
+    <h1>Central de Apostas Pessoal</h1>
+    <div class="calcBox">
+      <div class="pill">
+        <div class="row"><label>Banca (pré-aposta):</label>
+          <input id="bankInput" type="number" step="0.01" min="0" value="100.00" />
+          <span class="tiny muted">(valor usado para calcular stake = 4% da banca)</span>
+        </div>
+        <hr />
+        <div class="row">
+          <label>% estimada do evento:</label>
+          <input id="userProb" type="number" min="0" max="100" step="0.1" value="55" class="small" />
 
-<h2>Calculadora de Apostas Profissional</h2>
+          <label>Odd apostada:</label>
+          <input id="oddInput" type="number" min="1" step="0.01" value="2.00" class="small" />
 
-<label>Vitórias/Pontos Equipa A:</label>
-<input type="number" id="vitA" placeholder="Vitórias ou Pontos A" min="0">
+          <label>Avaliação:</label>
+          <input id="evalField" type="text" readonly value="-" class="small" />
+        </div>
 
-<label>Jogos Totais / Pontos Máx Equipa A:</label>
-<input type="number" id="totalA" placeholder="Jogos Totais ou Pontos Máx A" min="1">
+        <div class="row">
+          <label>Stake (4% da banca):</label>
+          <input id="stakeField" type="text" readonly value="-" class="small" />
+          <button id="recalcBtn">Recalcular</button>
+          <div class="tiny muted">Arredondamento: sempre para o próximo múltiplo de 0.5 (ex: 3.23 → 3.5; 4.78 → 5.0)</div>
+        </div>
 
-<label>Vitórias/Pontos Equipa B:</label>
-<input type="number" id="vitB" placeholder="Vitórias ou Pontos B" min="0">
+        <div class="row">
+          <div id="evBox" class="muted">EV (percentual): -</div>
+          <div id="recommendation" class="right neutral">-</div>
+        </div>
+      </div>
 
-<label>Jogos Totais / Pontos Máx Equipa B:</label>
-<input type="number" id="totalB" placeholder="Jogos Totais ou Pontos Máx B" min="1">
+      <div class="pill">
+        <div class="row"><strong>Resumo rápido</strong></div>
+        <div class="row"><span class="muted">Prob. implícita da odd:</span><span id="implProb" style="margin-left:8px">-</span></div>
+        <div class="row"><span class="muted">EV por 1€ apostado:</span><span id="evPerEuro" style="margin-left:8px">-</span></div>
+        <div class="note">Regra usada para recomendação: se a tua % estimada for maior do que a probabilidade implícita da odd (1/odd), então há EV positivo — sugerido apostar.</div>
+      </div>
 
-<label>Buffer de segurança (diferença mínima para apostar)</label>
-<input type="number" id="buffer" placeholder="Buffer" step="0.01" value="0.2">
+    </div>
+  </header>
 
-<hr>
+  <main>
+    <section style="margin-top:18px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <h2 style="margin:0">Log de Apostas</h2>
+        <div class="actions right">
+          <button id="addRowBtn">Adicionar aposta</button>
+          <button id="exportCsv">Exportar CSV</button>
+          <button id="clearLog">Limpar log</button>
+        </div>
+      </div>
 
-<label>
-  <input type="checkbox" id="casaCheck"> Equipa A joga em casa? (Fator casa +5%)
-</label>
+      <table id="betsTable">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Banca pré-aposta</th>
+            <th>Nome do jogo</th>
+            <th>Evento</th>
+            <th>Odd</th>
+            <th>Stake</th>
+            <th>Resultado (W/L/V)</th>
+            <th>Banca pós-aposta</th>
+            <th>Data</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+  </main>
 
-<label>
-  <input type="checkbox" id="h2hCheck"> Equipa A tem vantagem H2H? (H2H +3%)
-</label>
+  <!-- hidden form area -->
+  <div id="formArea" style="display:none;margin-top:12px;padding:10px;border:1px dashed #ddd;border-radius:8px;background:#fff;">
+    <div class="row" style="gap:8px;flex-wrap:wrap">
+      <input id="gameName" placeholder="Nome do jogo (ex: Porto x Benfica)" style="flex:1" />
+      <input id="eventName" placeholder="Evento (ex: Handicap, Resultado final)" style="flex:1" />
+      <input id="oddNew" type="number" min="1" step="0.01" value="2.00" style="width:110px" />
+      <select id="resultSel">
+        <option value="W">W</option>
+        <option value="L">L</option>
+        <option value="V">V</option>
+      </select>
+      <button id="saveBet">Guardar aposta</button>
+      <button id="cancelAdd">Cancelar</button>
+    </div>
+  </div>
 
-<button onclick="calcularAposta()">Calcular Aposta</button>
+  <script>
+    // Utilities
+    function roundUpToNearestHalf(x){
+      return Math.ceil(x*2)/2;
+    }
+    function fmt(x){return Number(x).toLocaleString('pt-PT',{minimumFractionDigits:2,maximumFractionDigits:2});}
 
-<div class="resultado" id="resultado"></div>
+    // Elements
+    const bankInput = document.getElementById('bankInput');
+    const userProb = document.getElementById('userProb');
+    const oddInput = document.getElementById('oddInput');
+    const evalField = document.getElementById('evalField');
+    const stakeField = document.getElementById('stakeField');
+    const recalcBtn = document.getElementById('recalcBtn');
+    const implProb = document.getElementById('implProb');
+    const evBox = document.getElementById('evBox');
+    const recommendation = document.getElementById('recommendation');
+    const evPerEuro = document.getElementById('evPerEuro');
 
-<script>
-function calcularZona(forca) {
-    if(forca >= 0.85) return 1;
-    else if(forca >= 0.70) return 2;
-    else if(forca >= 0.50) return 3;
-    else if(forca >= 0.30) return 4;
-    else return 5;
-}
+    const betsTableBody = document.querySelector('#betsTable tbody');
+    const addRowBtn = document.getElementById('addRowBtn');
+    const formArea = document.getElementById('formArea');
+    const gameName = document.getElementById('gameName');
+    const eventName = document.getElementById('eventName');
+    const oddNew = document.getElementById('oddNew');
+    const resultSel = document.getElementById('resultSel');
+    const saveBet = document.getElementById('saveBet');
+    const cancelAdd = document.getElementById('cancelAdd');
+    const exportCsvBtn = document.getElementById('exportCsv');
+    const clearLogBtn = document.getElementById('clearLog');
 
-function getZonaClasse(zona) {
-    return 'zona' + zona;
-}
+    // Storage keys
+    const STORAGE_LOG = 'central_apostas_log_v1';
+    const STORAGE_BANK = 'central_apostas_bank_v1';
 
-function calcularAposta() {
-    let vitA = parseFloat(document.getElementById('vitA').value);
-    let totalA = parseFloat(document.getElementById('totalA').value);
-    let vitB = parseFloat(document.getElementById('vitB').value);
-    let totalB = parseFloat(document.getElementById('totalB').value);
-    let buffer = parseFloat(document.getElementById('buffer').value);
+    // State
+    let log = JSON.parse(localStorage.getItem(STORAGE_LOG) || '[]');
+    let bank = parseFloat(localStorage.getItem(STORAGE_BANK) || bankInput.value);
+    bankInput.value = fmt(bank);
 
-    if(totalA <= 0 || totalB <= 0) {
-        document.getElementById('resultado').innerHTML = "Jogos/Pontos Máx devem ser > 0";
-        return;
+    function calcImplProb(odd){
+      if(!odd || odd<=0) return 0;
+      return (1/odd)*100;
     }
 
-    // Força relativa básica
-    let forcaA = vitA / totalA;
-    let forcaB = vitB / totalB;
-
-    // Aplicar fator casa +5%
-    if(document.getElementById('casaCheck').checked) {
-        forcaA += 0.05;
-        forcaB -= 0.05;
+    function calcStakeFromBank(b){
+      const raw = b*0.04;
+      const rounded = roundUpToNearestHalf(raw);
+      return rounded;
     }
 
-    // Aplicar H2H +3%
-    if(document.getElementById('h2hCheck').checked) {
-        forcaA += 0.03;
-        forcaB -= 0.03;
+    function updateCalculatorUI(){
+      const b = parseFloat(bankInput.value || 0);
+      bank = b;
+      localStorage.setItem(STORAGE_BANK, bank.toString());
+      const up = parseFloat(userProb.value || 0);
+      const odd = parseFloat(oddInput.value || 0);
+      const ip = calcImplProb(odd);
+      implProb.textContent = ip ? ip.toFixed(2) + '%' : '-';
+
+      const stake = calcStakeFromBank(b);
+      stakeField.value = stake ? formatCurrency(stake) : '-';
+
+      // EV per 1 euro
+      // EV = userProb*(odd-1) - (1-userProb)
+      const p = up/100;
+      const ev1 = (p*(odd-1) - (1-p));
+      evPerEuro.textContent = isFinite(ev1) ? ev1.toFixed(4) : '-';
+
+      // EV percentual vs implied
+      const evPercent = (up - ip).toFixed(2);
+      evBox.textContent = 'Diferença (tua % - implícita): ' + evPercent + '%';
+
+      const recommend = up > ip;
+      recommendation.textContent = recommend ? 'Sugerido: APOSTAR' : 'Sugerido: NÃO APOSTAR';
+      recommendation.className = recommend ? 'positive' : 'negative';
+
+      // Eval field
+      evalField.value = recommend ? 'Apostar (EV positivo)' : 'Não apostar (EV negativo)';
     }
 
-    // Garantir limites 0-1
-    forcaA = Math.min(Math.max(forcaA,0),1);
-    forcaB = Math.min(Math.max(forcaB,0),1);
-
-    // Zonas
-    let zonaA = calcularZona(forcaA);
-    let zonaB = calcularZona(forcaB);
-
-    // Diferença
-    let diff = forcaA - forcaB;
-
-    // Decisão
-    let decisao = "";
-    if(Math.abs(diff) < buffer) {
-        decisao = "Sem aposta (diferença menor que buffer)";
-    } else {
-        decisao = (diff > 0) ? `Aposta na Equipa A (Zona ${zonaA})` : `Aposta na Equipa B (Zona ${zonaB})`;
+    function formatCurrency(x){
+      return Number(x).toLocaleString('pt-PT',{minimumFractionDigits:2,maximumFractionDigits:2});
     }
 
-    // Resultado com cores
-    document.getElementById('resultado').innerHTML = `
-        Força Equipa A: <span class="${getZonaClasse(zonaA)}">${forcaA.toFixed(2)} (Zona ${zonaA})</span><br>
-        Força Equipa B: <span class="${getZonaClasse(zonaB)}">${forcaB.toFixed(2)} (Zona ${zonaB})</span><br>
-        Diferença: ${diff.toFixed(2)}<br>
-        <strong>${decisao}</strong>
-    `;
-}
-</script>
+    function renderLog(){
+      betsTableBody.innerHTML = '';
+      log.forEach((row,i)=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${i+1}</td>
+          <td>€ ${formatCurrency(row.bank_pre)}</td>
+          <td>${escapeHtml(row.game)}</td>
+          <td>${escapeHtml(row.event)}</td>
+          <td>${row.odd}</td>
+          <td>€ ${formatCurrency(row.stake)}</td>
+          <td>${row.result}</td>
+          <td>€ ${formatCurrency(row.bank_post)}</td>
+          <td>${new Date(row.date).toLocaleString('pt-PT')}</td>
+        `;
+        betsTableBody.appendChild(tr);
+      });
+    }
 
+    function escapeHtml(s){
+      if(!s) return '';
+      return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function addBetToLog(game, event, odd, result){
+      const bank_pre = parseFloat(bankInput.value || 0);
+      const stake = calcStakeFromBank(bank_pre);
+      let bank_post = bank_pre;
+      if(result === 'W'){
+        // profit = stake * (odd - 1)
+        bank_post = bank_pre + stake * (odd - 1);
+      } else if(result === 'L'){
+        bank_post = bank_pre - stake;
+      } else if(result === 'V'){
+        bank_post = bank_pre; // stake returned
+      }
+      // normalize to 2 decimals
+      bank_post = Math.round(bank_post*100)/100;
+
+      const entry = {
+        date: new Date().toISOString(),
+        bank_pre: Math.round(bank_pre*100)/100,
+        game: game || '-',
+        event: event || '-',
+        odd: Number(odd),
+        stake: Math.round(stake*100)/100,
+        result: result,
+        bank_post: bank_post
+      };
+      log.push(entry);
+      localStorage.setItem(STORAGE_LOG, JSON.stringify(log));
+      // update bank input to new post value and persist
+      bankInput.value = formatCurrency(bank_post);
+      bank = bank_post;
+      localStorage.setItem(STORAGE_BANK, bank.toString());
+      updateCalculatorUI();
+      renderLog();
+    }
+
+    // CSV export
+    function exportCsv(){
+      if(!log.length){ alert('Log vazio'); return; }
+      const header = ['#','bank_pre','game','event','odd','stake','result','bank_post','date'];
+      const rows = log.map((r,i)=>[
+        i+1, r.bank_pre, '"'+r.game.replace(/"/g,'""')+'"', '"'+r.event.replace(/"/g,'""')+'"', r.odd, r.stake, r.result, r.bank_post, r.date
+      ].join(','));
+      const csv = [header.join(','), ...rows].join('\n');
+      const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'central_apostas_log.csv'; document.body.appendChild(a); a.click(); a.remove();
+    }
+
+    // init
+    updateCalculatorUI();
+    renderLog();
+
+    // events
+    recalcBtn.addEventListener('click', ()=>updateCalculatorUI());
+    [userProb, oddInput, bankInput].forEach(el=>el.addEventListener('input', updateCalculatorUI));
+
+    addRowBtn.addEventListener('click', ()=>{
+      formArea.style.display = formArea.style.display === 'none' ? 'block' : 'none';
+      // prefill odd and game
+      oddNew.value = oddInput.value;
+      gameName.value = '';
+      eventName.value = '';
+    });
+    cancelAdd.addEventListener('click', ()=>{formArea.style.display='none'});
+
+    saveBet.addEventListener('click', ()=>{
+      const g = gameName.value.trim();
+      const e = eventName.value.trim();
+      const odd = parseFloat(oddNew.value || 0);
+      const result = resultSel.value;
+      if(!odd || odd <= 1){ alert('Insere uma odd válida (>= 1.01)'); return; }
+      addBetToLog(g,e,odd,result);
+      formArea.style.display = 'none';
+    });
+
+    exportCsvBtn.addEventListener('click', exportCsv);
+
+    clearLogBtn.addEventListener('click', ()=>{
+      if(confirm('Limpar log? Isto não é reversível.')){
+        log = []; localStorage.removeItem(STORAGE_LOG); renderLog();
+      }
+    });
+
+    // small helper: when user changes bank manually ensure formatting
+    bankInput.addEventListener('blur', ()=>{ bankInput.value = formatCurrency(parseFloat(bankInput.value||0)); updateCalculatorUI(); });
+
+    // keep odd input for add form in sync when changed in main calc
+    oddInput.addEventListener('input', ()=>{ oddNew.value = oddInput.value; });
+
+  </script>
 </body>
 </html>
