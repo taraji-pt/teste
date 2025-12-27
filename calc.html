@@ -2,7 +2,7 @@
 <html lang="pt">
 <head>
 <meta charset="UTF-8">
-<title>Market Parser — Clean</title>
+<title>HT O0.5 — 1X2 Classifier</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
 body{
@@ -52,26 +52,13 @@ th,td{
   border-bottom:1px solid #1e293b;
 }
 th{color:#94a3b8;font-size:12px}
-.goals{color:#22c55e;font-weight:700}
-.corners{color:#38bdf8;font-weight:700}
-.skip{color:#ef4444;font-weight:700}
-.manual{
-  margin-top:26px;
-  padding-top:18px;
-  border-top:1px solid #1e293b;
-}
-input{
-  padding:8px;
-  border-radius:8px;
-  border:none;
-  background:#0f172a;
-  color:#e5e7eb;
-  width:100%;
-}
-.grid{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:12px;
+.green{color:#22c55e;font-weight:700}
+.yellow{color:#facc15;font-weight:700}
+.red{color:#ef4444;font-weight:700}
+.note{
+  margin-top:14px;
+  font-size:12px;
+  color:#94a3b8;
 }
 </style>
 </head>
@@ -79,92 +66,83 @@ input{
 
 <div class="container">
 <div class="card">
-<h1>Market Parser — Clean</h1>
 
-<textarea id="input"></textarea>
+<h1>HT Over 0.5 — 1X2 Classifier</h1>
 
-<button onclick="processar()">Processar Batch</button>
+<textarea id="input" placeholder="Formato:
+Jogo, odd1 oddX odd2
+Ex:
+Leicester vs Watford, 2.15 3.26 2.90
+Bolton vs Rotherham, 1.35 4.06 7.33"></textarea>
+
+<button onclick="classificar()">Classificar</button>
 
 <div id="output"></div>
 
-<!-- INPUT MANUAL -->
-<div class="manual">
-<h3>Entrada Manual (fallback)</h3>
-<div class="grid">
-  <input id="mh" type="number" step="0.25" placeholder="Handicap">
-  <input id="mg" type="number" step="0.25" placeholder="O/U Golos">
-</div>
-<button onclick="manual()">Avaliar Manual</button>
-<div id="manualOut"></div>
-</div>
+<p class="note">
+🟢 = Favorável | 🟡 = Borderline | 🔴 = Evitar  
+(Regras baseadas apenas em odds 1X2 de abertura)
+</p>
 
 </div>
 </div>
 
 <script>
-function decide(h,g){
-  if(h>=1.0 && g>=2.75) return ["⚽ Over Golos","goals"];
-  if(h>=0.75 && g<=2.5) return ["🚩 Over Cantos","corners"];
-  return ["❌ Skip","skip"];
-}
-
-function processar(){
-  const lines = document.getElementById("input").value
+function classificar(){
+  const lines=document.getElementById("input").value
     .split("\n")
-    .map(l=>l.trim());
+    .map(l=>l.trim())
+    .filter(l=>l);
 
-  let rows=[];
-  for(let i=0;i<lines.length;i++){
-    // linha das equipas (tem 0 - 0 e handicap no fim)
-    if(!/0\s*-\s*0/.test(lines[i])) continue;
+  let html="<table><tr><th>#</th><th>Jogo</th><th>1</th><th>X</th><th>2</th><th>Sinal</th></tr>";
 
-    // handicap = último número da linha
-    const hMatch = lines[i].match(/([+-]?\d+(\.\d+)?)\s*$/);
-    if(!hMatch) continue;
-    const handicap = Math.abs(parseFloat(hMatch[1]));
+  lines.forEach((line,i)=>{
+    const parts=line.split(",");
+    if(parts.length<2) return;
 
-    // nome do jogo
-    const parts = lines[i].split(/0\s*-\s*0/);
-    if(parts.length!==2) continue;
-    const teamA = parts[0].replace(/.*\d{2}:\d{2}/,"").trim();
-    const teamB = parts[1].replace(hMatch[1],"").trim();
-    const game = teamA+" vs "+teamB;
+    const game=parts[0].trim();
+    const odds=parts[1].trim().split(/\s+/).map(Number);
+    if(odds.length!==3) return;
 
-    // linha seguinte com golos (duas linhas abaixo)
-    let goals=null;
-    for(let j=i+1;j<i+6 && j<lines.length;j++){
-      if(/^\d+(\.\d+)?$/.test(lines[j])){
-        goals=parseFloat(lines[j]);
-        break;
-      }
+    const [o1,ox,o2]=odds;
+    const fav=Math.min(o1,o2);
+    const dog=Math.max(o1,o2);
+
+    let signal="🟡 Yellow";
+    let cls="yellow";
+
+    // 🔴 RED rules
+    if(
+      fav<=1.30 ||
+      (ox>=3.80 && fav<=1.65) ||
+      (dog>=6.50 && fav<=1.50)
+    ){
+      signal="🔴 Red";
+      cls="red";
     }
-    if(goals===null) continue;
 
-    const [txt,cls]=decide(handicap,goals);
-    rows.push({game,handicap,goals,txt,cls});
-  }
+    // 🟢 GREEN rules
+    else if(
+      (ox<=3.30 && fav>=1.75 && dog<=4.50) ||
+      (o1<=2.80 && o2<=2.80)
+    ){
+      signal="🟢 Green";
+      cls="green";
+    }
 
-  let html="<table><tr><th>#</th><th>Jogo</th><th>Handicap</th><th>O/U</th><th>Decisão</th></tr>";
-  rows.forEach((r,i)=>{
-    html+=`<tr>
+    html+=`
+    <tr>
       <td>${i+1}</td>
-      <td>${r.game}</td>
-      <td>${r.handicap}</td>
-      <td>${r.goals}</td>
-      <td class="${r.cls}">${r.txt}</td>
+      <td>${game}</td>
+      <td>${o1}</td>
+      <td>${ox}</td>
+      <td>${o2}</td>
+      <td class="${cls}">${signal}</td>
     </tr>`;
   });
+
   html+="</table>";
   document.getElementById("output").innerHTML=html;
-}
-
-function manual(){
-  const h=parseFloat(document.getElementById("mh").value);
-  const g=parseFloat(document.getElementById("mg").value);
-  if(isNaN(h)||isNaN(g)) return;
-  const [txt,cls]=decide(h,g);
-  document.getElementById("manualOut").innerHTML=
-    `<p class="${cls}">${txt}</p>`;
 }
 </script>
 
