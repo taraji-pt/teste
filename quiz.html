@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>What is your World Food Match?</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f4f4;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+    }
+
+    .quiz-container {
+      background: white;
+      width: 90%;
+      max-width: 700px;
+      padding: 30px;
+      border-radius: 15px;
+      box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 10px;
+    }
+
+    #instructions {
+      text-align: center;
+      color: #666;
+      margin-bottom: 25px;
+    }
+
+    h2 {
+      margin-bottom: 25px;
+      line-height: 1.4;
+    }
+
+    .option {
+      display: block;
+      width: 100%;
+      padding: 15px;
+      margin-bottom: 12px;
+      border: 2px solid #ddd;
+      border-radius: 10px;
+      background: white;
+      cursor: pointer;
+      transition: 0.2s;
+      font-size: 16px;
+      text-align: left;
+      line-height: 1.4;
+    }
+
+    .option:hover {
+      background: #f0f0f0;
+      border-color: #999;
+    }
+
+    #progress {
+      margin-bottom: 20px;
+      color: #777;
+      font-size: 14px;
+    }
+
+    #result {
+      text-align: center;
+    }
+
+    #result h1 {
+      margin-bottom: 20px;
+    }
+
+    #resultText {
+      font-size: 18px;
+      line-height: 1.7;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="quiz-container">
+
+    <h1>🍜 What is your World Food Match?</h1>
+    <div id="instructions">
+      Choose the option that best describes you.
+    </div>
+
+    <div id="quiz">
+      <div id="progress"></div>
+
+      <h2 id="question"></h2>
+
+      <button class="option" onclick="selectAnswer('A')" id="btnA"></button>
+      <button class="option" onclick="selectAnswer('B')" id="btnB"></button>
+      <button class="option" onclick="selectAnswer('C')" id="btnC"></button>
+      <button class="option" onclick="selectAnswer('D')" id="btnD"></button>
+    </div>
+
+    <div id="result" style="display:none;">
+      <h1>🏆 Your Result</h1>
+      <p id="resultText"></p>
+    </div>
+
+  </div>
+
+  <script>
+    const questions = [
+      {
+        question: "1. How do you feel when you try a completely new and exotic dish?",
+        options: {
+          A: "I feel excited; I love the mix of sweet and spicy flavors!",
+          B: "I feel fascinated by the traditions and the use of hands.",
+          C: "I am interested in the technique, like how to slurp noodles correctly.",
+          D: "I feel relaxed; I prefer a meal where I can use my knife and fork properly."
+        }
+      },
+      {
+        question: "2. How would you describe your ideal dinner atmosphere?",
+        options: {
+          A: "It’s stimulating – lots of colors, street food vibes, and a spoon and fork on the table.",
+          B: "It’s surprising – a communal experience where everyone shares from the same plate with their right hand.",
+          C: "It’s satisfying – a quiet place where making sound while eating is actually a compliment!",
+          D: "It’s comforting – a formal and polite setting, even when eating a sandwich or chicken."
+        }
+      },
+      {
+        question: "3. Which of these situations sounds more annoying to you?",
+        options: {
+          A: "Using a fork to put food in my mouth.",
+          B: "Accidentally using my left hand to reach for a snack.",
+          C: "Eating in total silence without showing the chef I’m enjoying the meal.",
+          D: "Having to eat a burger or pizza with my bare hands."
+        }
+      },
+      {
+        question: "4. You see a video of someone slurping soup very loudly. What is your reaction?",
+        options: {
+          A: "I think it’s amusing, but I prefer my quiet rice and curry.",
+          B: "I’m confused; in my country, that’s not very common.",
+          C: "I’m inspired! It means the food is delicious and the flavor is improving.",
+          D: "I feel shocked; table manners should be strict."
+        }
+      },
+      {
+        question: "5. What kind of texture do you find most invigorating?",
+        options: {
+          A: "A balance of crunchy peanuts and soft rice noodles.",
+          B: "Warm, soft bread used to scoop up rich spicy sauces.",
+          C: "The perfect bite of a fresh noodle in a hot broth.",
+          D: "A well-cooked piece of meat that requires a sharp knife."
+        }
+      },
+      {
+        question: "6. If you had to describe your culinary personality, you would say:",
+        options: {
+          A: "I am charmed by tropical and bold flavors.",
+          B: "I am amazed by ancient traditions and eating with soul.",
+          C: "I am intrigued by perfection and unique eating sounds.",
+          D: "I am pleased by elegance and traditional etiquette."
+        }
+      }
+    ];
+
+    let currentQuestion = 0;
+
+    const answersCount = {
+      A: 0,
+      B: 0,
+      C: 0,
+      D: 0
+    };
+
+    function loadQuestion() {
+      const q = questions[currentQuestion];
+
+      document.getElementById("progress").innerText =
+        `Question ${currentQuestion + 1} of ${questions.length}`;
+
+      document.getElementById("question").innerText = q.question;
+
+      document.getElementById("btnA").innerText = "A) " + q.options.A;
+      document.getElementById("btnB").innerText = "B) " + q.options.B;
+      document.getElementById("btnC").innerText = "C) " + q.options.C;
+      document.getElementById("btnD").innerText = "D) " + q.options.D;
+    }
+
+    function selectAnswer(letter) {
+      answersCount[letter]++;
+      currentQuestion++;
+
+      if (currentQuestion < questions.length) {
+        loadQuestion();
+      } else {
+        showResult();
+      }
+    }
+
+    function showResult() {
+      document.getElementById("quiz").style.display = "none";
+      document.getElementById("result").style.display = "block";
+
+      let mostCommon = "A";
+
+      for (let key in answersCount) {
+        if (answersCount[key] > answersCount[mostCommon]) {
+          mostCommon = key;
+        }
+      }
+
+      let resultText = "";
+
+      switch(mostCommon) {
+
+        case "A":
+          resultText = `
+          🇹🇭 THAILAND<br><br>
+          You love a balance of flavors! You are amazed by the complexity of Thai food.
+          Sweet, spicy, fresh, and vibrant — your culinary spirit is adventurous and energetic.<br><br>
+          Don’t forget: in Thailand, the fork is only used to push food onto the spoon!
+          `;
+          break;
+
+        case "B":
+          resultText = `
+          🇮🇳 INDIA<br><br>
+          You value connection and tradition.
+          You appreciate food as a shared and emotional experience, full of history and soul.<br><br>
+          Eating with your right hand feels authentic, meaningful, and deeply cultural.
+          `;
+          break;
+
+        case "C":
+          resultText = `
+          🇯🇵 JAPAN<br><br>
+          You are a true foodie!
+          Precision, technique, and respect for food matter deeply to you.<br><br>
+          For you, slurping noodles is not rude — it’s a compliment to the chef and part of the perfect experience.
+          `;
+          break;
+
+        case "D":
+          resultText = `
+          🇨🇱 CHILE<br><br>
+          You appreciate manners, structure, and traditional etiquette.
+          You feel most comfortable with proper table settings and classic dining habits.<br><br>
+          Knife and fork? Always the safest choice.
+          `;
+          break;
+      }
+
+      document.getElementById("resultText").innerHTML = resultText;
+    }
+
+    loadQuestion();
+  </script>
+
+</body>
+</html>
