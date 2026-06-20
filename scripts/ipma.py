@@ -12,8 +12,11 @@ r.raise_for_status()
 
 dados = r.json()
 
-for timestamp in sorted(dados.keys(), reverse=True):
+ultimo = None
+a = ""
+b = ""
 
+for timestamp in sorted(dados.keys(), reverse=True):
 registo = dados[timestamp]
 
 if registo is None:
@@ -22,11 +25,14 @@ if registo is None:
 est_a = registo.get(ESTACAO_A, {})
 est_b = registo.get(ESTACAO_B, {})
 
-a = est_a.get("precAcumulada")
-b = est_b.get("precAcumulada")
+a = est_a.get("precAcumulada", "")
+b = est_b.get("precAcumulada", "")
 
 ultimo = timestamp
 break
+
+if ultimo is None:
+raise Exception("Nenhum registo válido encontrado")
 
 ficheiro = "dados/historico.csv"
 
