@@ -14,7 +14,6 @@ dados = r.json()
 
 for timestamp in sorted(dados.keys(), reverse=True):
 
-```
 registo = dados[timestamp]
 
 if registo is None:
@@ -28,7 +27,6 @@ b = est_b.get("precAcumulada")
 
 ultimo = timestamp
 break
-```
 
 ficheiro = "dados/historico.csv"
 
@@ -39,20 +37,16 @@ with open(ficheiro, newline="", encoding="utf-8") as f:
 leitor = csv.reader(f)
 next(leitor, None)
 
-```
     for linha in leitor:
         if linha:
             ja_existe.add(linha[0])
-```
 
 if ultimo not in ja_existe:
 with open(ficheiro, "a", newline="", encoding="utf-8") as f:
 escritor = csv.writer(f)
 escritor.writerow([ultimo, a, b])
 
-```
 print("Novo registo guardado:", ultimo)
-```
 
 else:
 print("Registo já existente:", ultimo)
