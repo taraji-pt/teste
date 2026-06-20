@@ -5,7 +5,7 @@ import os
 URL = "https://api.ipma.pt/open-data/observation/meteorology/stations/observations.json"
 
 ESTACAO_A = "5210758"
-ESTACAO_B = "1210766"
+AESTACAO_B = "1210766"
 
 r = requests.get(URL, timeout=30)
 r.raise_for_status()
