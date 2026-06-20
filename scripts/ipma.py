@@ -44,8 +44,8 @@ for timestamp in sorted(dados.keys()):
     if timestamp in existentes:
         continue
 
-    est_a = registo.get(ESTACAO_A, {})
-    est_b = registo.get(ESTACAO_B, {})
+    est_a = registo.get(ESTACAO_A) or {}
+    est_b = registo.get(ESTACAO_B) or {}
 
     chuva_a = est_a.get("precAcumulada", "")
     chuva_b = est_b.get("precAcumulada", "")
