@@ -7,37 +7,52 @@ URL = "https://api.ipma.pt/open-data/observation/meteorology/stations/observatio
 ESTACAO_A = "5210758"
 ESTACAO_B = "1210766"
 
-r = requests.get(URL)
+r = requests.get(URL, timeout=30)
+r.raise_for_status()
+
 dados = r.json()
 
-ultimo = sorted(dados.keys())[-1]
+for timestamp in sorted(dados.keys(), reverse=True):
 
-a = dados[ultimo].get(ESTACAO_A, {}).get("precAcumulada")
-b = dados[ultimo].get(ESTACAO_B, {}).get("precAcumulada")
+```
+registo = dados[timestamp]
 
-if a is None:
-    a = ""
+if registo is None:
+    continue
 
-if b is None:
-    b = ""
+est_a = registo.get(ESTACAO_A, {})
+est_b = registo.get(ESTACAO_B, {})
+
+a = est_a.get("precAcumulada")
+b = est_b.get("precAcumulada")
+
+ultimo = timestamp
+break
+```
 
 ficheiro = "dados/historico.csv"
 
 ja_existe = set()
 
 if os.path.exists(ficheiro):
-    with open(ficheiro, newline="", encoding="utf-8") as f:
-        leitor = csv.reader(f)
-        next(leitor, None)
+with open(ficheiro, newline="", encoding="utf-8") as f:
+leitor = csv.reader(f)
+next(leitor, None)
 
-        for linha in leitor:
+```
+    for linha in leitor:
+        if linha:
             ja_existe.add(linha[0])
+```
 
 if ultimo not in ja_existe:
-    with open(ficheiro, "a", newline="", encoding="utf-8") as f:
-        escritor = csv.writer(f)
-        escritor.writerow([ultimo, a, b])
+with open(ficheiro, "a", newline="", encoding="utf-8") as f:
+escritor = csv.writer(f)
+escritor.writerow([ultimo, a, b])
 
-    print("Novo registo guardado")
+```
+print("Novo registo guardado:", ultimo)
+```
+
 else:
-    print("Já existe")
+print("Registo já existente:", ultimo)
