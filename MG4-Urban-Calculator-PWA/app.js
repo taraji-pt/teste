@@ -56,11 +56,14 @@ if($("timeMinutes")) $("timeMinutes").addEventListener("blur",()=>{
   $("timeMinutes").value=Math.min(59,Math.max(0,+$("timeMinutes").value||0));
   calculate();
 });
-$("calculateBtn").addEventListener("click",calculate);
 $("settingsBtn").addEventListener("click",()=>{loadCfg();$("settingsDialog").showModal()});
 $("saveSettings").addEventListener("click",saveCfg);
 document.querySelector(".close").addEventListener("click",()=>$("settingsDialog").close());
-document.querySelectorAll("#presets button").forEach(b=>b.addEventListener("click",()=>{$("cfgPower").value=b.dataset.power}));
+document.querySelectorAll("#presets button").forEach(b=>b.addEventListener("click",()=>{
+  $("cfgPower").value=b.dataset.power;
+  cfg.power=+b.dataset.power;
+  calculate();
+}));
 $("resetBtn").addEventListener("click",()=>{cfg={...DEFAULTS};localStorage.setItem("mg4cfg",JSON.stringify(cfg));loadCfg();calculate()});
 loadCfg();calculate();
 
