@@ -27,7 +27,10 @@ function calculate(){
     const delta=Math.max(0,to-from); energy=cap*delta/100; range=energy/cons*100; cost=energy/eff*cfg.price;
     primaryLabel="TEMPO ESTIMADO"; primaryValue=timeText((energy/eff)/power);
   }else if(mode==="time"){
-    const min=Math.max(0,+$("minutes").value||0),from=Math.min(100,Math.max(0,+$("timeFrom").value||0)),p=Math.max(.01,+$("timePower").value||power);
+    const hours=Math.max(0,+$("timeHours").value||0);
+    const minutes=Math.min(59,Math.max(0,+$("timeMinutes").value||0));
+    const min=hours*60+minutes;
+    const from=Math.min(100,Math.max(0,+$("timeFrom").value||0)),p=Math.max(.01,+$("timePower").value||power);
     energy=p*(min/60)*eff; const addedPct=energy/cap*100; const final=Math.min(100,from+addedPct); range=energy/cons*100; cost=(energy/eff)*cfg.price;
     primaryLabel="BATERIA FINAL"; primaryValue=`${fmt(final,0)} %`;
     energy=Math.min(cap*addedPct/100,cap*(100-from)/100);
@@ -49,6 +52,10 @@ document.querySelectorAll(".mode").forEach(btn=>btn.addEventListener("click",()=
   calculate();
 }));
 document.querySelectorAll("input").forEach(i=>i.addEventListener("input",calculate));
+if($("timeMinutes")) $("timeMinutes").addEventListener("blur",()=>{
+  $("timeMinutes").value=Math.min(59,Math.max(0,+$("timeMinutes").value||0));
+  calculate();
+});
 $("calculateBtn").addEventListener("click",calculate);
 $("settingsBtn").addEventListener("click",()=>{loadCfg();$("settingsDialog").showModal()});
 $("saveSettings").addEventListener("click",saveCfg);

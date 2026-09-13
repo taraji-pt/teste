@@ -61,10 +61,10 @@
       </div>
 
       <div id="panel-time" class="panel">
-        <label class="field wide">
-          <span>CARREGAR DURANTE</span>
-          <div class="input-wrap"><input id="minutes" type="number" min="1" step="1" value="45"><b>min</b></div>
-        </label>
+        <div class="mini-row time-duration">
+          <label class="field"><span>HORAS</span><div class="input-wrap"><input id="timeHours" type="number" min="0" step="1" value="0"><b>h</b></div></label>
+          <label class="field"><span>MINUTOS</span><div class="input-wrap"><input id="timeMinutes" type="number" min="0" max="59" step="1" value="45"><b>m</b></div></label>
+        </div>
         <div class="mini-row">
           <label class="field"><span>BATERIA</span><div class="input-wrap"><input id="timeFrom" type="number" min="0" max="100" step="1" value="60"><b>%</b></div></label>
           <label class="field"><span>POTÊNCIA ATUAL</span><div class="input-wrap"><input id="timePower" type="number" min="0.1" step="0.1" value="2.4"><b>kW</b></div></label>
@@ -90,7 +90,6 @@
         </div>
       </div>
 
-      <button class="calculate" id="calculateBtn">CALCULAR</button>
       <p class="note">Estimativa baseada nos valores configurados e na potência efetiva de carregamento.</p>
     </section>
 
