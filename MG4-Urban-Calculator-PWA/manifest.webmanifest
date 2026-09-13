@@ -1,0 +1,14 @@
+{
+  "name": "MG4 Urban Calculator",
+  "short_name": "MG4 Calc",
+  "description": "Calculadora pessoal de carga e autonomia para MG4 Urban.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f5f5f2",
+  "theme_color": "#f5f5f2",
+  "orientation": "portrait",
+  "lang": "pt-PT",
+  "icons": [
+    {"src":"icons/icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
+  ]
+}
