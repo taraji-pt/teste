@@ -4,6 +4,7 @@
   --bg:#f5f5f2;--card:#ffffff;--ink:#101010;--muted:#777772;--line:#e4e4df;
   --accent:#d71920;--soft:#ecece7;--shadow:0 18px 45px rgba(0,0,0,.07);
 }
+
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);font-family:Inter,-apple-system,BlinkMacSystemFont,"SF Pro Display",sans-serif}
 body{min-height:100dvh}
@@ -33,6 +34,7 @@ button{cursor:pointer}
   justify-content:center;
   overflow:visible;
 }
+
 .car-art img{
   width:100%;
   height:100%;
@@ -40,6 +42,7 @@ button{cursor:pointer}
   object-position:center;
   display:block;
 }
+
 .mode-switch{display:grid;grid-template-columns:repeat(3,1fr);background:#e9e9e4;border-radius:13px;padding:4px;margin:3px 0 20px}
 .mode{border:0;background:transparent;padding:11px 4px;border-radius:10px;font-size:10px;letter-spacing:.08em;font-weight:700;color:#85857f}
 .mode.active{background:#fff;color:#111;box-shadow:0 2px 7px rgba(0,0,0,.06)}
@@ -70,8 +73,12 @@ dialog::backdrop{background:rgba(0,0,0,.38);backdrop-filter:blur(5px)}
 .settings-section{border-top:1px solid var(--line);padding:20px 0}.settings-section h3{font-size:9px;letter-spacing:.15em;margin:0 0 13px;color:#777;font-weight:800}.settings-section+.settings-section{margin-top:0}
 .settings .field{margin-bottom:12px}.preset-title{font-size:8px;letter-spacing:.12em;color:#999;margin:15px 4px 7px}.presets{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:15px}.presets button{border:1px solid var(--line);background:#fff;border-radius:11px;height:39px;font-size:11px;font-weight:700}.presets button:active{transform:scale(.97)}
 .save{width:100%;height:54px;border:0;border-radius:16px;background:#111;color:#fff;font-weight:800;font-size:10px;letter-spacing:.14em}.settings-note{font-size:8px;color:#999;line-height:1.5;text-align:center;margin:12px 18px}
+
 @media(max-height:760px){.car-hero{height:88px}.car-art{height:88px}.result-card{margin-top:10px}.input-wrap{height:52px}.calculate{height:50px}}
+
 @media(prefers-color-scheme:dark){
   :root{--bg:#111;--card:#1b1b1b;--ink:#f5f5f2;--muted:#999;--line:#2d2d2d;--soft:#222}
   .mg-mark{border-color:#eee}.icon-btn{color:#ddd}.mode-switch{background:#222}.mode.active{background:#2b2b2b;color:#fff}.input-wrap{background:#1b1b1b;border-color:#2d2d2d}.input-wrap input{color:#fff}.settings{background:#111}.close,.presets button{background:#1b1b1b;color:#fff;border-color:#2d2d2d}footer{border-color:#2d2d2d}.car-body,.roof{background:#e9e9e9}.window{background:#bdbdbd}.wheel{background:#111;border-color:#666}
+  .settings .field>span{color:#fff}
+  .dialog-head h2{color:#fff}
 }
