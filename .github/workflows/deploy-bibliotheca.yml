@@ -1,4 +1,3 @@
-
 name: Deploy Bibliotheca to GitHub Pages
 
 on:
@@ -29,8 +28,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: bibliotheca/package-lock.json
 
       - name: Install dependencies
         working-directory: bibliotheca
