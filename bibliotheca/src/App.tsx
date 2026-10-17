@@ -283,35 +283,6 @@ function App() {
     } finally { setBusyIsbn(false); }
   }
 
-  async function saveCloud() {
-    if (!supabase || !cloudUser) { setToast('Inicia sessão para sincronizar.'); return; }
-    const { data: userData } = await supabase.auth.getUser();
-    const uid = userData.user?.id;
-    if (!uid) { setToast('Sessão inválida. Volta a iniciar sessão.'); return; }
-    const rows = books.map(b => ({ id: b.id, user_id: uid, data: b }));
-    const loanRows = loans.map(l => ({ id: l.id, user_id: uid, data: l }));
-    const [bRes, lRes] = await Promise.all([
-      supabase.from('library_books').upsert(rows),
-      supabase.from('library_loans').upsert(loanRows)
-    ]);
-    if (bRes.error || lRes.error) setToast('Erro na sincronização. Confirma se executaste o SQL de configuração.');
-    else setToast('Biblioteca enviada para a nuvem.');
-  }
-  async function loadCloud() {
-    if (!supabase || !cloudUser) { setToast('Inicia sessão para sincronizar.'); return; }
-    const [bRes, lRes] = await Promise.all([
-      supabase.from('library_books').select('data'),
-      supabase.from('library_loans').select('data')
-    ]);
-    if (bRes.error || lRes.error) { setToast('Não foi possível carregar a biblioteca da nuvem.'); return; }
-    const cloudBooks = (bRes.data ?? []).map((r: {data:Book}) => r.data);
-    const cloudLoans = (lRes.data ?? []).map((r: {data:Loan}) => r.data);
-    if (cloudBooks.length || cloudLoans.length) {
-      if (window.confirm('Substituir os dados deste dispositivo pelos dados da nuvem? Exporta uma cópia antes, se necessário.')) {
-        setBooks(cloudBooks); setLoans(cloudLoans); setToast('Dados carregados da nuvem.');
-      }
-    } else setToast('A biblioteca na nuvem está vazia. Usa “Enviar para a nuvem” primeiro.');
-  }
   async function auth() {
     if (!supabase) return;
     const result = cloudUser
@@ -391,7 +362,7 @@ function App() {
         <div className="auth-head"><div><strong>Sincronização privada</strong><small>{cloudConfigured?'Liga-te à tua conta para sincronizar.':'Configuração Supabase necessária.'}</small></div><button className="icon-btn" onClick={()=>setShowAuth(false)}><X size={17}/></button></div>
         {!cloudConfigured ? <p className="muted small">Cria um projeto Supabase, configura as variáveis VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY e executa o ficheiro <code>supabase/schema.sql</code>.</p> : <>
           {!cloudUser && <><input className="field" placeholder="Email" value={authEmail} onChange={e=>setAuthEmail(e.target.value)}/><input className="field" placeholder="Palavra-passe" type="password" value={authPassword} onChange={e=>setAuthPassword(e.target.value)}/></>}
-          <div className="button-row"><button className="btn secondary" onClick={auth}>{cloudUser?'Terminar sessão':'Iniciar sessão'}</button>{cloudUser&&<><button className="btn secondary" onClick={loadCloud}><Download size={15}/>Carregar nuvem</button><button className="btn primary" onClick={saveCloud}><Cloud size={15}/>Enviar para nuvem</button></>}</div>
+          <div className="button-row"><button className="btn secondary" onClick={auth}>{cloudUser?'Terminar sessão':'Iniciar sessão'}</button></div>{cloudUser&&<p className="muted small">Sessão ativa. Os livros e empréstimos são sincronizados automaticamente entre os teus dispositivos.</p>}
         </>}
       </div>}
       <div className="content">
