@@ -40,13 +40,18 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
+      - name: Prepare site folder
+        run: |
+          mkdir -p _site/bibliotheca
+          cp -R bibliotheca/dist/. _site/bibliotheca/
+
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: bibliotheca/dist
+          path: _site
 
   deploy:
     environment:
