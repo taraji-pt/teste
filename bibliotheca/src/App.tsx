@@ -1,0 +1,302 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  BookOpen, Search, Plus, LayoutGrid, List, LibraryBig, Tags, Bookmark,
+  Users, Settings, ChevronDown, X, ScanBarcode, Cloud, CloudOff, Download,
+  Upload, Pencil, Trash2, MapPin, CircleCheck, Clock3, BookMarked, ArrowUpRight,
+  Star, Menu, RotateCcw, Save
+} from 'lucide-react';
+import { Html5Qrcode } from 'html5-qrcode';
+import type { Book, Loan, ReadingStatus } from './types';
+import { categories, sampleBooks, sampleLoans } from './data';
+import { cloudConfigured, supabase } from './supabase';
+
+type Section = 'Biblioteca' | 'Categorias' | 'Empréstimos' | 'Autores';
+const BOOKS_KEY = 'bibliotheca-books-v1';
+const LOANS_KEY = 'bibliotheca-loans-v1';
+
+function load<T>(key: string, fallback: T): T {
+  try {
+    const v = localStorage.getItem(key);
+    return v ? JSON.parse(v) as T : fallback;
+  } catch { return fallback; }
+}
+function newId() { return crypto.randomUUID(); }
+function emptyBook(): Book {
+  return { id: newId(), title: '', authors: [], isbn: '', publisher: '', year: '',
+    category: 'Teologia reformada', tags: [], status: 'Por ler', rating: 0,
+    notes: '', shelf: '', cover: '', createdAt: new Date().toISOString() };
+}
+function initials(authors: string[]) {
+  return authors.map(a => a.split(/\s+/).filter(Boolean).slice(-1)[0]).join(', ');
+}
+function App() {
+  const [books, setBooks] = useState<Book[]>(() => load(BOOKS_KEY, sampleBooks));
+  const [loans, setLoans] = useState<Loan[]>(() => load(LOANS_KEY, sampleLoans));
+  const [section, setSection] = useState<Section>('Biblioteca');
+  const [query, setQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('Todas as categorias');
+  const [statusFilter, setStatusFilter] = useState('Todos os estados');
+  const [view, setView] = useState<'grid'|'list'>('grid');
+  const [editor, setEditor] = useState<Book | null>(null);
+  const [loanEditor, setLoanEditor] = useState<Book | null>(null);
+  const [scanOpen, setScanOpen] = useState(false);
+  const [scanMessage, setScanMessage] = useState('');
+  const [busyIsbn, setBusyIsbn] = useState(false);
+  const [toast, setToast] = useState('');
+  const [mobileMenu, setMobileMenu] = useState(false);
+  const [cloudUser, setCloudUser] = useState<string | null>(null);
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [showAuth, setShowAuth] = useState(false);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { localStorage.setItem(BOOKS_KEY, JSON.stringify(books)); }, [books]);
+  useEffect(() => { localStorage.setItem(LOANS_KEY, JSON.stringify(loans)); }, [loans]);
+  useEffect(() => {
+    if (!supabase) return;
+    supabase.auth.getSession().then(({ data }) => setCloudUser(data.session?.user.email ?? null));
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => setCloudUser(session?.user.email ?? null));
+    return () => listener.subscription.unsubscribe();
+  }, []);
+  useEffect(() => {
+    if (!toast) return;
+    const t = window.setTimeout(() => setToast(''), 3000);
+    return () => window.clearTimeout(t);
+  }, [toast]);
+  useEffect(() => {
+    if (!scanOpen) return;
+    const timer = window.setTimeout(async () => {
+      try {
+        const scanner = new Html5Qrcode('isbn-reader');
+        scannerRef.current = scanner;
+        await scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 260, height: 140 } },
+          async text => {
+            const isbn = text.replace(/[^0-9Xx]/g, '');
+            if (isbn.length >= 10) {
+              await scanner.stop().catch(() => {});
+              setScanOpen(false);
+              setEditor({ ...emptyBook(), isbn });
+              await lookupIsbn(isbn, { ...emptyBook(), isbn });
+            }
+          }, () => {});
+      } catch {
+        setScanMessage('Não foi possível aceder à câmara. Confirma as permissões ou introduz o ISBN manualmente.');
+      }
+    }, 100);
+    return () => {
+      window.clearTimeout(timer);
+      const scanner = scannerRef.current;
+      if (scanner?.isScanning) scanner.stop().catch(() => {});
+      scannerRef.current = null;
+    };
+  }, [scanOpen]);
+
+  const filtered = useMemo(() => books.filter(b => {
+    const haystack = [b.title, ...b.authors, b.isbn, b.publisher, b.category, ...b.tags, b.shelf].join(' ').toLocaleLowerCase('pt-PT');
+    return haystack.includes(query.toLocaleLowerCase('pt-PT')) &&
+      (categoryFilter === 'Todas as categorias' || b.category === categoryFilter) &&
+      (statusFilter === 'Todos os estados' || b.status === statusFilter);
+  }).sort((a,b) => a.title.localeCompare(b.title, 'pt-PT')), [books, query, categoryFilter, statusFilter]);
+
+  const activeLoans = loans.filter(l => !l.returnedAt);
+  const authors = [...new Set(books.flatMap(b => b.authors).filter(Boolean))].sort((a,b) => a.localeCompare(b, 'pt-PT'));
+  const stats = [
+    { label: 'Livros no catálogo', value: books.length, icon: LibraryBig },
+    { label: 'Por ler', value: books.filter(b => b.status === 'Por ler').length, icon: Bookmark },
+    { label: 'Já lidos', value: books.filter(b => b.status === 'Lido').length, icon: BookMarked },
+    { label: 'Emprestados', value: activeLoans.length, icon: Users }
+  ];
+
+  async function lookupIsbn(isbn: string, target?: Book) {
+    const normalized = isbn.replace(/[^0-9Xx]/g, '');
+    if (!normalized) { setToast('Introduz um ISBN válido.'); return; }
+    setBusyIsbn(true);
+    try {
+      const res = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${encodeURIComponent(normalized)}&format=json&jscmd=data`);
+      if (!res.ok) throw new Error('Falha na consulta bibliográfica');
+      const data = await res.json();
+      const item = data[`ISBN:${normalized}`];
+      if (!item) { setToast('Não encontrámos metadados para este ISBN. Podes preencher a ficha manualmente.'); return; }
+      const next = target ?? editor ?? emptyBook();
+      const updated: Book = {
+        ...next,
+        title: item.title || next.title,
+        authors: item.authors?.map((a: {name:string}) => a.name) ?? next.authors,
+        publisher: item.publishers?.[0]?.name ?? next.publisher,
+        year: item.publish_date?.match(/\d{4}/)?.[0] ?? next.year,
+        isbn: normalized,
+        cover: item.cover?.large || item.cover?.medium || item.cover?.small || next.cover
+      };
+      setEditor(updated);
+      setToast('Metadados encontrados. Confirma os dados antes de guardar.');
+    } catch {
+      setToast('Não foi possível consultar o catálogo. Verifica a ligação à internet.');
+    } finally { setBusyIsbn(false); }
+  }
+
+  async function saveCloud() {
+    if (!supabase || !cloudUser) { setToast('Inicia sessão para sincronizar.'); return; }
+    const { data: userData } = await supabase.auth.getUser();
+    const uid = userData.user?.id;
+    if (!uid) { setToast('Sessão inválida. Volta a iniciar sessão.'); return; }
+    const rows = books.map(b => ({ id: b.id, user_id: uid, data: b }));
+    const loanRows = loans.map(l => ({ id: l.id, user_id: uid, data: l }));
+    const [bRes, lRes] = await Promise.all([
+      supabase.from('library_books').upsert(rows),
+      supabase.from('library_loans').upsert(loanRows)
+    ]);
+    if (bRes.error || lRes.error) setToast('Erro na sincronização. Confirma se executaste o SQL de configuração.');
+    else setToast('Biblioteca enviada para a nuvem.');
+  }
+  async function loadCloud() {
+    if (!supabase || !cloudUser) { setToast('Inicia sessão para sincronizar.'); return; }
+    const [bRes, lRes] = await Promise.all([
+      supabase.from('library_books').select('data'),
+      supabase.from('library_loans').select('data')
+    ]);
+    if (bRes.error || lRes.error) { setToast('Não foi possível carregar a biblioteca da nuvem.'); return; }
+    const cloudBooks = (bRes.data ?? []).map((r: {data:Book}) => r.data);
+    const cloudLoans = (lRes.data ?? []).map((r: {data:Loan}) => r.data);
+    if (cloudBooks.length || cloudLoans.length) {
+      if (window.confirm('Substituir os dados deste dispositivo pelos dados da nuvem? Exporta uma cópia antes, se necessário.')) {
+        setBooks(cloudBooks); setLoans(cloudLoans); setToast('Dados carregados da nuvem.');
+      }
+    } else setToast('A biblioteca na nuvem está vazia. Usa “Enviar para a nuvem” primeiro.');
+  }
+  async function auth() {
+    if (!supabase) return;
+    const result = cloudUser
+      ? await supabase.auth.signOut()
+      : await supabase.auth.signInWithPassword({ email: authEmail, password: authPassword });
+    if (result.error) setToast(result.error.message);
+    else { setCloudUser(null); setShowAuth(false); setToast(cloudUser ? 'Sessão terminada.' : 'Sessão iniciada.'); }
+  }
+  function exportData() {
+    const blob = new Blob([JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), books, loans }, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `bibliotheca-backup-${new Date().toISOString().slice(0,10)}.json`; a.click();
+    URL.revokeObjectURL(url);
+  }
+  function importData(file?: File) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(String(reader.result));
+        if (!Array.isArray(data.books) || !Array.isArray(data.loans)) throw new Error();
+        if (window.confirm(`Importar ${data.books.length} livros e ${data.loans.length} empréstimos? Os dados atuais serão substituídos.`)) {
+          setBooks(data.books); setLoans(data.loans); setToast('Biblioteca importada.');
+        }
+      } catch { setToast('Ficheiro inválido. Escolhe uma cópia Bibliotheca JSON.'); }
+    };
+    reader.readAsText(file);
+  }
+  function saveBook() {
+    if (!editor?.title.trim()) { setToast('O título é obrigatório.'); return; }
+    const normalized = { ...editor, authors: editor.authors.map(a => a.trim()).filter(Boolean) };
+    setBooks(prev => prev.some(b => b.id === normalized.id) ? prev.map(b => b.id === normalized.id ? normalized : b) : [normalized, ...prev]);
+    setEditor(null); setToast('Livro guardado.');
+  }
+  function deleteBook(book: Book) {
+    if (!window.confirm(`Eliminar “${book.title}” do catálogo?`)) return;
+    setBooks(prev => prev.filter(b => b.id !== book.id));
+    setLoans(prev => prev.filter(l => l.bookId !== book.id));
+    setToast('Livro eliminado.');
+  }
+  function addLoan(book: Book, borrower: string, dueAt: string, notes: string) {
+    if (!borrower.trim()) { setToast('Indica a pessoa a quem emprestaste o livro.'); return; }
+    setLoans(prev => [{ id: newId(), bookId: book.id, borrower: borrower.trim(), lentAt: new Date().toISOString().slice(0,10), dueAt, returnedAt: '', notes }, ...prev]);
+    setLoanEditor(null); setToast('Empréstimo registado.');
+  }
+  const navItems = [
+    { label: 'Biblioteca' as Section, icon: BookOpen },
+    { label: 'Categorias' as Section, icon: Tags },
+    { label: 'Empréstimos' as Section, icon: Users },
+    { label: 'Autores' as Section, icon: Bookmark }
+  ];
+
+  return <div className="app-shell">
+    <aside className={`sidebar ${mobileMenu ? 'open' : ''}`}>
+      <div className="brand"><div className="brand-mark"><BookOpen size={22}/></div><div><strong>Bibliotheca</strong><small>Biblioteca teológica</small></div><button className="icon-btn close-menu" onClick={() => setMobileMenu(false)}><X size={18}/></button></div>
+      <div className="side-label">A MINHA COLEÇÃO</div>
+      <nav>{navItems.map(item => <button key={item.label} className={`nav-item ${section===item.label?'active':''}`} onClick={() => {setSection(item.label);setMobileMenu(false);}}><item.icon size={18}/><span>{item.label}</span>{item.label==='Biblioteca'&&<span className="nav-count">{books.length}</span>}</button>)}</nav>
+      <div className="side-label section-label">COLEÇÕES</div>
+      <button className="nav-item" onClick={() => {setSection('Biblioteca');setCategoryFilter('Teologia reformada');}}><span className="collection-dot sage"/>Teologia reformada</button>
+      <button className="nav-item" onClick={() => {setSection('Biblioteca');setCategoryFilter('Comentários bíblicos');}}><span className="collection-dot ochre"/>Comentários bíblicos</button>
+      <button className="nav-item" onClick={() => {setSection('Biblioteca');setCategoryFilter('Tradição baptista');}}><span className="collection-dot blue"/>Tradição baptista</button>
+      <div className="sidebar-bottom">
+        <div className="sync-card"><div className="sync-icon">{cloudConfigured?<Cloud size={18}/>:<CloudOff size={18}/>}</div><div><strong>{cloudConfigured?'Sincronização disponível':'Modo local'}</strong><small>{cloudUser||'Dados neste dispositivo'}</small></div><button className="tiny-icon" title="Configurar sincronização" onClick={() => setShowAuth(v=>!v)}><Settings size={15}/></button></div>
+        <button className="nav-item" onClick={exportData}><Download size={17}/>Exportar cópia</button>
+        <button className="nav-item" onClick={() => fileRef.current?.click()}><Upload size={17}/>Importar cópia</button>
+        <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={e=>{importData(e.target.files?.[0]);e.currentTarget.value='';}}/>
+      </div>
+    </aside>
+    {mobileMenu && <div className="scrim" onClick={() => setMobileMenu(false)}/>}
+    <main className="main">
+      <header className="topbar">
+        <button className="icon-btn mobile-menu-btn" onClick={() => setMobileMenu(true)}><Menu size={20}/></button>
+        <div className="breadcrumbs"><span>Bibliotheca</span><span className="crumb-slash">/</span><strong>{section}</strong></div>
+        <div className="top-actions"><span className={`cloud-status ${cloudConfigured?'ready':''}`}><span className="status-dot"/>{cloudConfigured?'Nuvem configurável':'Só neste dispositivo'}</span><button className="avatar" onClick={() => setShowAuth(v=>!v)} title="Conta">TT</button></div>
+      </header>
+      {showAuth && <div className="auth-panel">
+        <div className="auth-head"><div><strong>Sincronização privada</strong><small>{cloudConfigured?'Liga-te à tua conta para sincronizar.':'Configuração Supabase necessária.'}</small></div><button className="icon-btn" onClick={()=>setShowAuth(false)}><X size={17}/></button></div>
+        {!cloudConfigured ? <p className="muted small">Cria um projeto Supabase, configura as variáveis VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY e executa o ficheiro <code>supabase/schema.sql</code>.</p> : <>
+          {!cloudUser && <><input className="field" placeholder="Email" value={authEmail} onChange={e=>setAuthEmail(e.target.value)}/><input className="field" placeholder="Palavra-passe" type="password" value={authPassword} onChange={e=>setAuthPassword(e.target.value)}/></>}
+          <div className="button-row"><button className="btn secondary" onClick={auth}>{cloudUser?'Terminar sessão':'Iniciar sessão'}</button>{cloudUser&&<><button className="btn secondary" onClick={loadCloud}><Download size={15}/>Carregar nuvem</button><button className="btn primary" onClick={saveCloud}><Cloud size={15}/>Enviar para nuvem</button></>}</div>
+        </>}
+      </div>}
+      <div className="content">
+        {section==='Biblioteca' && <>
+          <div className="page-heading"><div><div className="eyebrow">A TUA COLEÇÃO PRIVADA</div><h1>Uma biblioteca de <em>sabedoria.</em></h1><p className="subtitle">Toda a tua leitura teológica, organizada num só lugar.</p></div><button className="btn primary add-main" onClick={()=>setEditor(emptyBook())}><Plus size={17}/>Adicionar livro</button></div>
+          <div className="stats-grid">{stats.map(s=><div className="stat-card" key={s.label}><div className="stat-top"><span>{s.label}</span><s.icon size={17}/></div><div className="stat-number">{s.value}</div></div>)}</div>
+          <div className="toolbar"><div className="search-box"><Search size={17}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Pesquisar título, autor, ISBN, tema..."/>{query&&<button onClick={()=>setQuery('')}><X size={15}/></button>}<kbd>⌘ K</kbd></div><div className="toolbar-actions"><select value={categoryFilter} onChange={e=>setCategoryFilter(e.target.value)}><option>Todas as categorias</option>{categories.map(c=><option key={c}>{c}</option>)}</select><select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)}><option>Todos os estados</option>{(['Por ler','A ler','Lido','Consulta'] as ReadingStatus[]).map(s=><option key={s}>{s}</option>)}</select><div className="view-switch"><button className={view==='grid'?'selected':''} onClick={()=>setView('grid')} title="Grelha"><LayoutGrid size={17}/></button><button className={view==='list'?'selected':''} onClick={()=>setView('list')} title="Lista"><List size={17}/></button></div></div></div>
+          <div className="results-line"><span>{filtered.length} {filtered.length===1?'livro':'livros'} encontrados</span><button className="text-action" onClick={()=>{setQuery('');setCategoryFilter('Todas as categorias');setStatusFilter('Todos os estados');}}>Limpar filtros <RotateCcw size={13}/></button></div>
+          {filtered.length===0 ? <div className="empty-state"><BookOpen size={32}/><h3>Nenhum livro encontrado</h3><p>Experimenta alterar a pesquisa ou adiciona um livro à tua coleção.</p><button className="btn primary" onClick={()=>setEditor(emptyBook())}><Plus size={16}/>Adicionar primeiro livro</button></div> :
+          <div className={view==='grid'?'book-grid':'book-list'}>{filtered.map(book=><BookCard key={book.id} book={book} view={view} onEdit={()=>setEditor({...book})} onDelete={()=>deleteBook(book)} onLoan={()=>setLoanEditor(book)}/>)}</div>}
+        </>}
+        {section==='Categorias' && <><div className="page-heading"><div><div className="eyebrow">ORGANIZAÇÃO</div><h1>Temas e <em>disciplinas.</em></h1><p className="subtitle">Explora a coleção por área de estudo.</p></div></div><div className="category-grid">{categories.map((cat,i)=>{const count=books.filter(b=>b.category===cat).length;return <button className="category-card" key={cat} onClick={()=>{setCategoryFilter(cat);setSection('Biblioteca');}}><div className={`category-icon tone-${i%5}`}><Tags size={20}/></div><div className="category-info"><strong>{cat}</strong><small>{count} {count===1?'livro':'livros'}</small></div><ArrowUpRight size={17}/></button>})}</div></>}
+        {section==='Autores' && <><div className="page-heading"><div><div className="eyebrow">ÍNDICE ONOMÁSTICO</div><h1>Autores e <em>pensadores.</em></h1><p className="subtitle">Os autores presentes na tua biblioteca.</p></div></div><div className="authors-list">{authors.map(author=>{const count=books.filter(b=>b.authors.includes(author)).length;return <button className="author-row" key={author} onClick={()=>{setQuery(author);setSection('Biblioteca');}}><div className="author-avatar">{author.split(' ').map(p=>p[0]).slice(0,2).join('')}</div><strong>{author}</strong><span>{count} {count===1?'livro':'livros'}</span><ArrowUpRight size={16}/></button>})}{!authors.length&&<div className="empty-state">Os autores aparecerão aqui quando adicionares livros.</div>}</div></>}
+        {section==='Empréstimos' && <><div className="page-heading"><div><div className="eyebrow">GESTÃO DA COLEÇÃO</div><h1>Livros em <em>circulação.</em></h1><p className="subtitle">Acompanha os livros emprestados e as datas de devolução.</p></div></div><div className="loan-list">{loans.length===0?<div className="empty-state"><Users size={30}/><h3>Sem empréstimos registados</h3><p>Na ficha de um livro, escolhe “Emprestar”.</p></div>:loans.slice().sort((a,b)=>Number(Boolean(a.returnedAt))-Number(Boolean(b.returnedAt))).map(loan=>{const book=books.find(b=>b.id===loan.bookId);return <div className="loan-row" key={loan.id}><div className="mini-cover">{book?.cover?<img src={book.cover} alt=""/>:<BookOpen size={20}/>}</div><div className="loan-main"><strong>{book?.title||'Livro removido'}</strong><small>Emprestado a {loan.borrower} · {loan.lentAt}</small>{loan.dueAt&&<small>Devolução prevista: {loan.dueAt}</small>}</div><span className={`loan-status ${loan.returnedAt?'returned':loan.dueAt&&loan.dueAt<new Date().toISOString().slice(0,10)?'late':''}`}>{loan.returnedAt?'Devolvido':loan.dueAt&&loan.dueAt<new Date().toISOString().slice(0,10)?'Atrasado':'Emprestado'}</span>{!loan.returnedAt&&<button className="btn secondary compact" onClick={()=>{setLoans(prev=>prev.map(l=>l.id===loan.id?{...l,returnedAt:new Date().toISOString().slice(0,10)}:l));setToast('Devolução registada.')}}><CircleCheck size={15}/>Devolvido</button>}</div>})}</div></>}
+        <footer className="footer"><span>Bibliotheca <span className="footer-dot">·</span> Biblioteca privada</span><span>{cloudUser?'Conta ligada':'Os teus livros, ao teu ritmo.'}</span></footer>
+      </div>
+    </main>
+    {editor&&<BookModal book={editor} busyIsbn={busyIsbn} onClose={()=>setEditor(null)} onSave={saveBook} onChange={setEditor} onLookup={()=>lookupIsbn(editor.isbn,editor)} onScan={()=>{setScanMessage('');setScanOpen(true);}}/>}
+    {loanEditor&&<LoanModal book={loanEditor} onClose={()=>setLoanEditor(null)} onSave={addLoan}/>}
+    {scanOpen&&<div className="modal-backdrop"><div className="modal scan-modal"><div className="modal-header"><div><div className="eyebrow">ADICIONAR POR CÓDIGO</div><h2>Digitalizar ISBN</h2></div><button className="icon-btn" onClick={()=>setScanOpen(false)}><X/></button></div><p className="muted">Aponta a câmara para o código de barras ISBN-10 ou ISBN-13 na contracapa.</p><div id="isbn-reader" className="scanner-box"/>{scanMessage&&<p className="error-note">{scanMessage}</p>}<div className="modal-footer"><button className="btn secondary" onClick={()=>setScanOpen(false)}>Cancelar</button><button className="btn primary" onClick={()=>{setScanOpen(false);setEditor({...emptyBook()});}}>Introduzir manualmente</button></div></div></div>}
+    {toast&&<div className="toast"><CircleCheck size={17}/>{toast}</div>}
+  </div>;
+}
+
+function BookCard({book,view,onEdit,onDelete,onLoan}:{book:Book;view:'grid'|'list';onEdit:()=>void;onDelete:()=>void;onLoan:()=>void}) {
+  const [menu,setMenu] = useState(false);
+  return <article className={`book-card ${view==='list'?'list-mode':''}`}>
+    <button className="cover-button" onClick={onEdit} aria-label={`Editar ${book.title}`}><div className={`book-cover ${book.cover?'has-cover':''}`}>{book.cover?<img src={book.cover} alt={`Capa de ${book.title}`} loading="lazy"/>:<><div className="cover-rule"/><BookOpen size={25}/><strong>{book.title}</strong><small>{initials(book.authors)}</small><div className="cover-bottom">BIBLIOTHECA</div></>}</div></button>
+    <div className="book-info"><div className="book-meta"><span>{book.category}</span><div className="menu-wrap"><button className="tiny-icon" onClick={()=>setMenu(v=>!v)}><ChevronDown size={16}/></button>{menu&&<div className="action-menu"><button onClick={()=>{onEdit();setMenu(false)}}><Pencil size={14}/>Editar</button><button onClick={()=>{onLoan();setMenu(false)}}><Users size={14}/>Emprestar</button><button className="danger" onClick={()=>{onDelete();setMenu(false)}}><Trash2 size={14}/>Eliminar</button></div>}</div></div><button className="book-title" onClick={onEdit}>{book.title}</button><div className="book-author">{book.authors.join(', ')||'Autor desconhecido'}</div><div className="book-card-bottom"><span className={`reading-status status-${book.status.replaceAll(' ','-')}`}>{book.status}</span>{book.shelf&&<span className="shelf-label"><MapPin size={12}/>{book.shelf}</span>}</div>{book.rating>0&&<div className="rating">{Array.from({length:book.rating},(_,i)=><Star size={12} key={i} fill="currentColor"/>)}</div>}</div>
+  </article>;
+}
+
+function BookModal({book,busyIsbn,onClose,onSave,onChange,onLookup,onScan}:{book:Book;busyIsbn:boolean;onClose:()=>void;onSave:()=>void;onChange:(b:Book)=>void;onLookup:()=>void;onScan:()=>void}) {
+  const set = (key:keyof Book,value:unknown) => onChange({...book,[key]:value});
+  return <div className="modal-backdrop"><div className="modal book-modal"><div className="modal-header"><div><div className="eyebrow">CATÁLOGO PESSOAL</div><h2>{book.title?'Editar livro':'Adicionar livro'}</h2></div><button className="icon-btn" onClick={onClose}><X/></button></div>
+    <div className="form-grid"><label className="span-2">Título *<input autoFocus className="field" value={book.title} onChange={e=>set('title',e.target.value)} placeholder="Título da obra"/></label>
+      <label className="span-2">Autor(es)<input className="field" value={book.authors.join('; ')} onChange={e=>set('authors',e.target.value.split(';').map(s=>s.trim()).filter(Boolean))} placeholder="Separar autores com ponto e vírgula"/></label>
+      <label>ISBN<div className="isbn-row"><input className="field" value={book.isbn} onChange={e=>set('isbn',e.target.value)} placeholder="978…"/><button className="icon-btn scan-button" title="Digitalizar ISBN" onClick={onScan}><ScanBarcode size={18}/></button></div></label>
+      <label className="lookup-label"><span>Metadados</span><button className="btn secondary compact" disabled={busyIsbn||!book.isbn.trim()} onClick={onLookup}>{busyIsbn?'A pesquisar…':'Preencher por ISBN'}</button></label>
+      <label>Editora<input className="field" value={book.publisher} onChange={e=>set('publisher',e.target.value)} placeholder="Editora"/></label>
+      <label>Ano<input className="field" value={book.year} onChange={e=>set('year',e.target.value)} placeholder="2024"/></label>
+      <label className="span-2">Categoria<select className="field" value={book.category} onChange={e=>set('category',e.target.value)}>{categories.map(c=><option key={c}>{c}</option>)}</select></label>
+      <label>Estado de leitura<select className="field" value={book.status} onChange={e=>set('status',e.target.value)}>{(['Por ler','A ler','Lido','Consulta'] as ReadingStatus[]).map(s=><option key={s}>{s}</option>)}</select></label>
+      <label>Localização na estante<input className="field" value={book.shelf} onChange={e=>set('shelf',e.target.value)} placeholder="Estante A · Prateleira 2"/></label>
+      <label className="span-2">Etiquetas<input className="field" value={book.tags.join(', ')} onChange={e=>set('tags',e.target.value.split(',').map(s=>s.trim()).filter(Boolean))} placeholder="Puritanos, Baptista, Santificação…"/></label>
+      <label className="span-2">URL da capa (opcional)<input className="field" value={book.cover} onChange={e=>set('cover',e.target.value)} placeholder="https://…"/></label>
+      <label className="span-2">Notas pessoais<textarea className="field notes-field" value={book.notes} onChange={e=>set('notes',e.target.value)} placeholder="Ideias-chave, citações, referências…" rows={3}/></label>
+    </div>
+    <div className="modal-footer"><button className="btn secondary" onClick={onClose}>Cancelar</button><button className="btn primary" onClick={onSave}><Save size={16}/>Guardar livro</button></div>
+  </div></div>;
+}
+function LoanModal({book,onClose,onSave}:{book:Book;onClose:()=>void;onSave:(book:Book,borrower:string,dueAt:string,notes:string)=>void}) {
+  const [borrower,setBorrower]=useState(''); const [dueAt,setDueAt]=useState(''); const [notes,setNotes]=useState('');
+  return <div className="modal-backdrop"><div className="modal loan-modal"><div className="modal-header"><div><div className="eyebrow">GESTÃO DE EMPRÉSTIMO</div><h2>Emprestar livro</h2></div><button className="icon-btn" onClick={onClose}><X/></button></div><div className="loan-book-preview"><BookOpen size={21}/><div><strong>{book.title}</strong><small>{book.authors.join(', ')}</small></div></div><label>Emprestado a *<input autoFocus className="field" value={borrower} onChange={e=>setBorrower(e.target.value)} placeholder="Nome da pessoa"/></label><label>Data prevista de devolução<input className="field" type="date" value={dueAt} onChange={e=>setDueAt(e.target.value)}/></label><label>Notas<textarea className="field" rows={2} value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Contacto, condição do livro…"/></label><div className="modal-footer"><button className="btn secondary" onClick={onClose}>Cancelar</button><button className="btn primary" onClick={()=>onSave(book,borrower,dueAt,notes)}><Users size={16}/>Registar empréstimo</button></div></div></div>;
+}
+export default App;

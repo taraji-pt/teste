@@ -1,0 +1,11 @@
+{
+  "name": "Bibliotheca — Biblioteca Teológica",
+  "short_name": "Bibliotheca",
+  "description": "Biblioteca cristã pessoal e privada",
+  "start_url": "/teste/bibliotheca/",
+  "display": "standalone",
+  "background_color": "#f5f3ed",
+  "theme_color": "#20362e",
+  "icons": [],
+  "scope": "/teste/bibliotheca/"
+}
