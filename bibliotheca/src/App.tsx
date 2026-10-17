@@ -50,6 +50,11 @@ function App() {
   const [showAuth, setShowAuth] = useState(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const syncReadyRef = useRef(false);
+  const syncingRemoteRef = useRef(false);
+  const syncedBooksRef = useRef<Book[]>([]);
+  const syncedLoansRef = useRef<Loan[]>([]);
+  const syncTimerRef = useRef<number | null>(null);
 
   useEffect(() => { localStorage.setItem(BOOKS_KEY, JSON.stringify(books)); }, [books]);
   useEffect(() => { localStorage.setItem(LOANS_KEY, JSON.stringify(loans)); }, [loans]);
@@ -59,6 +64,149 @@ function App() {
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => setCloudUser(session?.user.email ?? null));
     return () => listener.subscription.unsubscribe();
   }, []);
+  useEffect(() => {
+    if (!supabase || !cloudUser) {
+      syncReadyRef.current = false;
+      return;
+    }
+    let cancelled = false;
+    let channel: ReturnType<NonNullable<typeof supabase>['channel']> | null = null;
+
+    const applyRemoteBooks = (rows: { id: string; data: Book }[]) => {
+      const remote = rows.map(row => row.data);
+      syncingRemoteRef.current = true;
+      syncedBooksRef.current = remote;
+      setBooks(remote);
+      window.setTimeout(() => { syncingRemoteRef.current = false; }, 0);
+    };
+    const applyRemoteLoans = (rows: { id: string; data: Loan }[]) => {
+      const remote = rows.map(row => row.data);
+      syncingRemoteRef.current = true;
+      syncedLoansRef.current = remote;
+      setLoans(remote);
+      window.setTimeout(() => { syncingRemoteRef.current = false; }, 0);
+    };
+
+    async function initialise() {
+      const { data: userData } = await supabase!.auth.getUser();
+      const uid = userData.user?.id;
+      if (!uid || cancelled) return;
+      const [bRes, lRes] = await Promise.all([
+        supabase!.from('library_books').select('id,data').eq('user_id', uid),
+        supabase!.from('library_loans').select('id,data').eq('user_id', uid)
+      ]);
+      if (cancelled) return;
+      if (bRes.error || lRes.error) {
+        setToast('Não foi possível iniciar a sincronização automática.');
+        return;
+      }
+      const remoteBooks = (bRes.data ?? []).map((r: {id:string;data:Book}) => r.data);
+      const remoteLoans = (lRes.data ?? []).map((r: {id:string;data:Loan}) => r.data);
+      if (remoteBooks.length || remoteLoans.length) {
+        applyRemoteBooks((bRes.data ?? []) as {id:string;data:Book}[]);
+        applyRemoteLoans((lRes.data ?? []) as {id:string;data:Loan}[]);
+      } else {
+        syncedBooksRef.current = [];
+        syncedLoansRef.current = [];
+        // First sign-in on a device: preserve its existing local collection by seeding the cloud.
+        const currentBooks = load<Book[]>(BOOKS_KEY, sampleBooks);
+        const currentLoans = load<Loan[]>(LOANS_KEY, sampleLoans);
+        const bookRows = currentBooks.map(b => ({ id: b.id, user_id: uid, data: b }));
+        const loanRows = currentLoans.map(l => ({ id: l.id, user_id: uid, data: l }));
+        const [bs, ls] = await Promise.all([
+          bookRows.length ? supabase!.from('library_books').upsert(bookRows) : Promise.resolve({error:null}),
+          loanRows.length ? supabase!.from('library_loans').upsert(loanRows) : Promise.resolve({error:null})
+        ]);
+        if (bs.error || ls.error) {
+          setToast('A sincronização automática não conseguiu guardar os dados iniciais.');
+          return;
+        }
+        syncedBooksRef.current = currentBooks;
+        syncedLoansRef.current = currentLoans;
+      }
+      syncReadyRef.current = true;
+      setToast('Sincronização automática ativa.');
+      channel = supabase!.channel('bibliotheca-auto-sync')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'library_books', filter: `user_id=eq.${uid}` }, payload => {
+          if (payload.eventType === 'DELETE') {
+            const id = String((payload.old as {id?:string}).id ?? '');
+            const next = syncedBooksRef.current.filter(b => b.id !== id);
+            syncedBooksRef.current = next;
+            syncingRemoteRef.current = true;
+            setBooks(next);
+            window.setTimeout(() => { syncingRemoteRef.current = false; }, 0);
+          } else {
+            const row = payload.new as {id:string;data:Book};
+            if (!row?.data) return;
+            const next = [...syncedBooksRef.current.filter(b => b.id !== row.id), row.data];
+            syncedBooksRef.current = next;
+            syncingRemoteRef.current = true;
+            setBooks(next);
+            window.setTimeout(() => { syncingRemoteRef.current = false; }, 0);
+          }
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'library_loans', filter: `user_id=eq.${uid}` }, payload => {
+          if (payload.eventType === 'DELETE') {
+            const id = String((payload.old as {id?:string}).id ?? '');
+            const next = syncedLoansRef.current.filter(l => l.id !== id);
+            syncedLoansRef.current = next;
+            syncingRemoteRef.current = true;
+            setLoans(next);
+            window.setTimeout(() => { syncingRemoteRef.current = false; }, 0);
+          } else {
+            const row = payload.new as {id:string;data:Loan};
+            if (!row?.data) return;
+            const next = [...syncedLoansRef.current.filter(l => l.id !== row.id), row.data];
+            syncedLoansRef.current = next;
+            syncingRemoteRef.current = true;
+            setLoans(next);
+            window.setTimeout(() => { syncingRemoteRef.current = false; }, 0);
+          }
+        })
+        .subscribe();
+    }
+    void initialise();
+    return () => {
+      cancelled = true;
+      syncReadyRef.current = false;
+      if (channel && supabase) void supabase.removeChannel(channel);
+    };
+  }, [cloudUser]);
+
+  useEffect(() => {
+    if (!supabase || !cloudUser || !syncReadyRef.current || syncingRemoteRef.current) return;
+    if (syncTimerRef.current) window.clearTimeout(syncTimerRef.current);
+    syncTimerRef.current = window.setTimeout(async () => {
+      const { data: userData } = await supabase!.auth.getUser();
+      const uid = userData.user?.id;
+      if (!uid || syncingRemoteRef.current) return;
+      const previousBooks = syncedBooksRef.current;
+      const previousLoans = syncedLoansRef.current;
+      const changedBooks = books.filter(book => {
+        const previous = previousBooks.find(item => item.id === book.id);
+        return !previous || JSON.stringify(previous) !== JSON.stringify(book);
+      });
+      const removedBooks = previousBooks.filter(previous => !books.some(book => book.id === previous.id));
+      const changedLoans = loans.filter(loan => {
+        const previous = previousLoans.find(item => item.id === loan.id);
+        return !previous || JSON.stringify(previous) !== JSON.stringify(loan);
+      });
+      const removedLoans = previousLoans.filter(previous => !loans.some(loan => loan.id === previous.id));
+      // Advance the local baseline before writes so realtime echoes are harmless.
+      syncedBooksRef.current = books;
+      syncedLoansRef.current = loans;
+      const tasks = [];
+      if (changedBooks.length) tasks.push(supabase!.from('library_books').upsert(changedBooks.map(data => ({id:data.id,user_id:uid,data}))));
+      if (removedBooks.length) tasks.push(supabase!.from('library_books').delete().eq('user_id',uid).in('id',removedBooks.map(b=>b.id)));
+      if (changedLoans.length) tasks.push(supabase!.from('library_loans').upsert(changedLoans.map(data => ({id:data.id,user_id:uid,data}))));
+      if (removedLoans.length) tasks.push(supabase!.from('library_loans').delete().eq('user_id',uid).in('id',removedLoans.map(l=>l.id)));
+      if (tasks.length) {
+        const results = await Promise.all(tasks);
+        if (results.some(result => result.error)) setToast('Erro ao sincronizar automaticamente. Verifica a ligação.');
+      }
+    }, 700);
+    return () => { if (syncTimerRef.current) window.clearTimeout(syncTimerRef.current); };
+  }, [books, loans, cloudUser]);
   useEffect(() => {
     if (!toast) return;
     const t = window.setTimeout(() => setToast(''), 3000);
