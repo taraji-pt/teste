@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "bibliotheca/**"
+      - "MG4-Urban-Calculator-PWA/**"
       - ".github/workflows/deploy-bibliotheca.yml"
   workflow_dispatch:
 
@@ -44,6 +45,8 @@ jobs:
         run: |
           mkdir -p _site/bibliotheca
           cp -R bibliotheca/dist/. _site/bibliotheca/
+          mkdir -p _site/MG4-Urban-Calculator-PWA
+          cp -R MG4-Urban-Calculator-PWA/. _site/MG4-Urban-Calculator-PWA/
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
