@@ -348,7 +348,7 @@ function App() {
 
   async function lookupIsbn(isbn: string, target?: Book) {
     const normalized = isbn.replace(/[^0-9Xx]/g, '').toUpperCase();
-    if (!normalized || (!/^\\d{9}[\\dX]$/.test(normalized) && !/^\\d{13}$/.test(normalized))) {
+    if (!normalized || (!/^\d{9}[\dX]$/.test(normalized) && !/^\d{13}$/.test(normalized))) {
       setToast('Introduz um ISBN-10 ou ISBN-13 válido.');
       return;
     }
