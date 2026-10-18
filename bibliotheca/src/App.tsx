@@ -36,6 +36,8 @@ function App() {
   const [categoryFilter, setCategoryFilter] = useState('Todas as categorias');
   const [userCategories, setUserCategories] = useState<string[]>(categories);
   const [newCategoryName, setNewCategoryName] = useState('');
+  const [categoryDeleteTarget, setCategoryDeleteTarget] = useState<string | null>(null);
+  const [categoryReassignments, setCategoryReassignments] = useState<Record<string, string>>({});
   const [view, setView] = useState<'grid'|'list'>('grid');
   const [editor, setEditor] = useState<Book | null>(null);
   const [loanEditor, setLoanEditor] = useState<Book | null>(null);
@@ -450,16 +452,52 @@ function App() {
     if (await persistCategories(next)) setNewCategoryName('');
   }
 
+  async function renameCategory(category: string) {
+    const raw = window.prompt('Novo nome da categoria:', category);
+    if (raw === null) return;
+    const name = raw.trim().replace(/\\s+/g, ' ');
+    if (!name) { setToast('O nome da categoria não pode ficar vazio.'); return; }
+    if (name.toLocaleLowerCase('pt-PT') !== category.toLocaleLowerCase('pt-PT') && userCategories.some(item => item.toLocaleLowerCase('pt-PT') === name.toLocaleLowerCase('pt-PT'))) {
+      setToast('Já existe uma categoria com esse nome.'); return;
+    }
+    if (name === category) return;
+    const next = userCategories.map(item => item === category ? name : item).sort((a,b) => a.localeCompare(b, 'pt-PT'));
+    if (await persistCategories(next)) {
+      setBooks(previous => previous.map(book => book.category === category ? { ...book, category: name } : book));
+      if (categoryFilter === category) setCategoryFilter(name);
+    }
+  }
+
   async function deleteCategory(category: string) {
-    const assigned = books.filter(book => book.category === category).length;
-    if (assigned) {
-      setToast(`A categoria tem ${assigned} ${assigned === 1 ? 'livro associado' : 'livros associados'}. Altera primeiro a categoria desses livros.`);
+    if (userCategories.length <= 1) { setToast('Mantém pelo menos uma categoria.'); return; }
+    const assigned = books.filter(book => book.category === category);
+    if (assigned.length) {
+      setCategoryDeleteTarget(category);
+      setCategoryReassignments(Object.fromEntries(assigned.map(book => [book.id, 'Sem categoria'])));
       return;
     }
-    if (userCategories.length <= 1) { setToast('Mantém pelo menos uma categoria.'); return; }
     if (!window.confirm(`Eliminar a categoria “${category}”?`)) return;
     const next = userCategories.filter(item => item !== category);
     if (await persistCategories(next) && categoryFilter === category) setCategoryFilter('Todas as categorias');
+  }
+
+  async function confirmDeleteCategory() {
+    if (!categoryDeleteTarget) return;
+    const category = categoryDeleteTarget;
+    const assigned = books.filter(book => book.category === category);
+    if (assigned.some(book => !categoryReassignments[book.id])) {
+      setToast('Escolhe uma categoria para cada livro.'); return;
+    }
+    const next = userCategories.filter(item => item !== category);
+    if (await persistCategories(next)) {
+      setBooks(previous => previous.map(book => book.category === category
+        ? { ...book, category: categoryReassignments[book.id] || 'Sem categoria' }
+        : book));
+      if (categoryFilter === category) setCategoryFilter('Todas as categorias');
+      setCategoryDeleteTarget(null);
+      setCategoryReassignments({});
+      setToast('Categoria eliminada e livros reclassificados.');
+    }
   }
 
   if (!authChecked) return <div className="auth-loading"><img src={`${import.meta.env.BASE_URL}bibliotheca-logo.png?v=3`} alt="" /><span>A preparar a tua biblioteca…</span></div>;
@@ -540,7 +578,7 @@ function App() {
           {filtered.length===0 ? <div className="empty-state"><BookOpen size={32}/><h3>Nenhum livro encontrado</h3><p>Experimenta alterar a pesquisa ou adiciona um livro à tua coleção.</p><button className="btn primary" onClick={()=>setEditor({...emptyBook(), category: userCategories[0] ?? ''})}><Plus size={16}/>Adicionar primeiro livro</button></div> :
           <div className={view==='grid'?'book-grid':'book-list'}>{filtered.map(book=><BookCard key={book.id} book={book} view={view} onEdit={()=>setEditor({...book})} onDelete={()=>deleteBook(book)} onLoan={()=>setLoanEditor(book)}/>)}</div>}
         </>}
-        {section==='Categorias' && <><div className="page-heading"><div><div className="eyebrow">ORGANIZAÇÃO</div><h1>Temas e <em>disciplinas.</em></h1><p className="subtitle">Cria e gere as categorias da tua biblioteca.</p></div></div><form className="category-create" onSubmit={e=>{e.preventDefault();void addCategory();}}><input className="field" value={newCategoryName} onChange={e=>setNewCategoryName(e.target.value)} placeholder="Nome da nova categoria" aria-label="Nome da nova categoria"/><button className="btn primary" type="submit"><Plus size={16}/>Adicionar categoria</button></form><div className="category-grid">{userCategories.map((cat,i)=>{const count=books.filter(b=>b.category===cat).length;return <div className="category-card" key={cat}><button className="category-open" onClick={()=>{setCategoryFilter(cat);setSection('Biblioteca');}}><div className={`category-icon tone-${i%5}`}><Tags size={20}/></div><div className="category-info"><strong>{cat}</strong><small>{count} {count===1?'livro':'livros'}</small></div><ArrowUpRight size={17}/></button><button className="category-delete" aria-label={`Eliminar categoria ${cat}`} title={count ? 'Altera primeiro os livros desta categoria' : 'Eliminar categoria'} onClick={()=>void deleteCategory(cat)}><Trash2 size={15}/></button></div>})}</div></>}
+        {section==='Categorias' && <><div className="page-heading"><div><div className="eyebrow">ORGANIZAÇÃO</div><h1>Temas e <em>disciplinas.</em></h1><p className="subtitle">Cria e gere as categorias da tua biblioteca.</p></div></div><form className="category-create" onSubmit={e=>{e.preventDefault();void addCategory();}}><input className="field" value={newCategoryName} onChange={e=>setNewCategoryName(e.target.value)} placeholder="Nome da nova categoria" aria-label="Nome da nova categoria"/><button className="btn primary" type="submit"><Plus size={16}/>Adicionar categoria</button></form><div className="category-grid">{userCategories.map((cat,i)=>{const count=books.filter(b=>b.category===cat).length;return <div className="category-card" key={cat}><button className="category-open" onClick={()=>{setCategoryFilter(cat);setSection('Biblioteca');}}><div className={`category-icon tone-${i%5}`}><Tags size={20}/></div><div className="category-info"><strong>{cat}</strong><small>{count} {count===1?'livro':'livros'}</small></div><ArrowUpRight size={17}/></button><button className="category-edit" aria-label={`Editar categoria ${cat}`} title="Editar nome" onClick={()=>void renameCategory(cat)}><Pencil size={15}/></button><button className="category-delete" aria-label={`Eliminar categoria ${cat}`} title="Eliminar categoria" onClick={()=>void deleteCategory(cat)}><Trash2 size={15}/></button></div>})}</div></>}
         {section==='Autores' && <><div className="page-heading"><div><div className="eyebrow">ÍNDICE ONOMÁSTICO</div><h1>Autores e <em>pensadores.</em></h1><p className="subtitle">Os autores presentes na tua biblioteca.</p></div></div><div className="authors-list">{authors.map(author=>{const count=books.filter(b=>b.authors.includes(author)).length;return <button className="author-row" key={author} onClick={()=>{setQuery(author);setSection('Biblioteca');}}><div className="author-avatar">{author.split(' ').map(p=>p[0]).slice(0,2).join('')}</div><strong>{author}</strong><span>{count} {count===1?'livro':'livros'}</span><ArrowUpRight size={16}/></button>})}{!authors.length&&<div className="empty-state">Os autores aparecerão aqui quando adicionares livros.</div>}</div></>}
         {section==='Empréstimos' && <><div className="page-heading"><div><div className="eyebrow">GESTÃO DA COLEÇÃO</div><h1>Livros em <em>circulação.</em></h1><p className="subtitle">Acompanha os livros emprestados e as datas de devolução.</p></div></div><div className="loan-list">{loans.length===0?<div className="empty-state"><Users size={30}/><h3>Sem empréstimos registados</h3><p>Na ficha de um livro, escolhe “Emprestar”.</p></div>:loans.slice().sort((a,b)=>Number(Boolean(a.returnedAt))-Number(Boolean(b.returnedAt))).map(loan=>{const book=books.find(b=>b.id===loan.bookId);return <div className="loan-row" key={loan.id}><div className="mini-cover">{book?.cover?<img src={book.cover} alt=""/>:<BookOpen size={20}/>}</div><div className="loan-main"><strong>{book?.title||'Livro removido'}</strong><small>Emprestado a {loan.borrower} · {loan.lentAt}</small>{loan.dueAt&&<small>Devolução prevista: {loan.dueAt}</small>}</div><span className={`loan-status ${loan.returnedAt?'returned':loan.dueAt&&loan.dueAt<new Date().toISOString().slice(0,10)?'late':''}`}>{loan.returnedAt?'Devolvido':loan.dueAt&&loan.dueAt<new Date().toISOString().slice(0,10)?'Atrasado':'Emprestado'}</span>{!loan.returnedAt&&<button className="btn secondary compact" onClick={()=>{setLoans(prev=>prev.map(l=>l.id===loan.id?{...l,returnedAt:new Date().toISOString().slice(0,10)}:l));setToast('Devolução registada.')}}><CircleCheck size={15}/>Devolvido</button>}</div>})}</div></>}
         <footer className="footer"><span></span><span>© Tiago Terraquente, 2026</span></footer>
@@ -548,6 +586,7 @@ function App() {
     </main>
     {editor&&<BookModal book={editor} categories={userCategories} onClose={()=>setEditor(null)} onSave={saveBook} onChange={setEditor}/>}
     {loanEditor&&<LoanModal book={loanEditor} onClose={()=>setLoanEditor(null)} onSave={addLoan}/>}
+    {categoryDeleteTarget && <div className="modal-backdrop"><div className="modal category-reassign-modal"><div className="modal-header"><div><div className="eyebrow">GESTÃO DE CATEGORIAS</div><h2>Eliminar “{categoryDeleteTarget}”</h2><p className="subtitle">Escolhe para onde transferir cada livro antes de eliminar esta categoria.</p></div><button className="icon-btn" onClick={()=>setCategoryDeleteTarget(null)} aria-label="Fechar"><X/></button></div><div className="category-reassign-list">{books.filter(book=>book.category===categoryDeleteTarget).map(book=><label className="category-reassign-row" key={book.id}><span><strong>{book.title || 'Livro sem título'}</strong><small>{book.authors.join(', ') || 'Autor não indicado'}</small></span><select className="field" value={categoryReassignments[book.id] || 'Sem categoria'} onChange={e=>setCategoryReassignments(previous=>({...previous,[book.id]:e.target.value}))}><option>Sem categoria</option>{userCategories.filter(cat=>cat!==categoryDeleteTarget).map(cat=><option key={cat}>{cat}</option>)}</select></label>)}</div><div className="modal-footer"><button className="btn secondary" onClick={()=>setCategoryDeleteTarget(null)}>Cancelar</button><button className="btn primary" onClick={()=>void confirmDeleteCategory()}><Trash2 size={16}/>Reclassificar e eliminar</button></div></div></div>}
     {toast&&<div className="toast"><CircleCheck size={17}/>{toast}</div>}
   </div>;
 }
