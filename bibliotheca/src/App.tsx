@@ -45,6 +45,7 @@ function App() {
   const [toast, setToast] = useState('');
   const [mobileMenu, setMobileMenu] = useState(false);
   const [cloudUser, setCloudUser] = useState<string | null>(null);
+  const [displayName, setDisplayName] = useState<string | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [cloudDataReadyFor, setCloudDataReadyFor] = useState<string | null>(null);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
@@ -80,12 +81,21 @@ function App() {
   }, [cloudUser]);
   useEffect(() => {
     if (!supabase) { setAuthChecked(true); return; }
+    const nameFromUser = (user: { user_metadata?: Record<string, unknown> } | null | undefined) => {
+      const metadata = user?.user_metadata;
+      const name = metadata?.display_name ?? metadata?.full_name ?? metadata?.name;
+      return typeof name === 'string' && name.trim() ? name.trim() : null;
+    };
     supabase.auth.getSession().then(({ data, error }) => {
-      if (!error) setCloudUser(data.session?.user.email ?? null);
+      if (!error) {
+        setCloudUser(data.session?.user.email ?? null);
+        setDisplayName(nameFromUser(data.session?.user));
+      }
       setAuthChecked(true);
     }).catch(() => setAuthChecked(true));
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setCloudUser(session?.user.email ?? null);
+      setDisplayName(nameFromUser(session?.user));
       setAuthChecked(true);
     });
     return () => listener.subscription.unsubscribe();
@@ -364,6 +374,7 @@ function App() {
   async function refreshAuthState() {
     if (!supabase) {
       setCloudUser(null);
+      setDisplayName(null);
       setShowAuth(true);
       return;
     }
@@ -377,7 +388,10 @@ function App() {
     if (email) {
       const { data: userData } = await supabase.auth.getUser();
       setCloudUser(userData.user?.email ?? email);
-    }
+      const metadata = userData.user?.user_metadata;
+      const name = metadata?.display_name ?? metadata?.full_name ?? metadata?.name;
+      setDisplayName(typeof name === 'string' && name.trim() ? name.trim() : null);
+    } else setDisplayName(null);
   }
 
   async function auth() {
@@ -387,6 +401,7 @@ function App() {
       if (result.error) setToast(result.error.message);
       else {
         setCloudUser(null);
+        setDisplayName(null);
         setShowAuth(false);
         setToast('Sessão terminada.');
       }
@@ -399,6 +414,9 @@ function App() {
     }
     const { data } = await supabase.auth.getSession();
     setCloudUser(data.session?.user.email ?? null);
+    const metadata = data.session?.user.user_metadata;
+    const name = metadata?.display_name ?? metadata?.full_name ?? metadata?.name;
+    setDisplayName(typeof name === 'string' && name.trim() ? name.trim() : null);
     setAuthChecked(true);
     setShowAuth(false);
     setAuthPassword('');
@@ -507,7 +525,7 @@ function App() {
       <header className="topbar">
         <button className="icon-btn mobile-menu-btn" onClick={() => setMobileMenu(true)}><Menu size={20}/></button>
         <div className="breadcrumbs"><span>BiblioTTheca</span><span className="crumb-slash">/</span><strong>{section}</strong></div>
-        <div className="top-actions"><button type="button" className={`live-toggle ${cloudUser ? 'is-live' : 'is-off'}`} onClick={() => { if (showAuth) setShowAuth(false); else { setShowAuth(true); void refreshAuthState(); } }} aria-expanded={showAuth} aria-label="Detalhes da sessão">{cloudUser ? 'LIVE' : cloudConfigured ? 'ON' : 'OFF'}</button></div>
+        <div className="top-actions"><button type="button" className={`live-toggle ${cloudUser ? 'is-live' : 'is-off'}`} onClick={() => { if (showAuth) setShowAuth(false); else { setShowAuth(true); void refreshAuthState(); } }} aria-expanded={showAuth} aria-label="Detalhes da sessão">{cloudUser ? `Olá ${displayName || cloudUser}` : cloudConfigured ? 'ON' : 'OFF'}</button></div>
       </header>
       {showAuth && <div className="auth-panel">
         <div className="auth-head"><div><strong>Sincronização privada</strong><small>{!cloudConfigured?'Configuração Supabase necessária.':cloudUser?`Sessão iniciada como ${cloudUser}.`:'Liga-te à tua conta para sincronizar.'}</small></div><button className="icon-btn" onClick={()=>setShowAuth(false)}><X size={17}/></button></div>
