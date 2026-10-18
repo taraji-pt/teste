@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 import type { Book, Loan, ReadingStatus } from './types';
-import { categories, sampleBooks, sampleLoans } from './data';
+import { categories } from './data';
 import { cloudConfigured, supabase } from './supabase';
 
 type Section = 'Biblioteca' | 'Categorias' | 'Empréstimos' | 'Autores';
@@ -30,8 +30,8 @@ function initials(authors: string[]) {
   return authors.map(a => a.split(/\s+/).filter(Boolean).slice(-1)[0]).join(', ');
 }
 function App() {
-  const [books, setBooks] = useState<Book[]>(() => load(BOOKS_KEY, sampleBooks));
-  const [loans, setLoans] = useState<Loan[]>(() => load(LOANS_KEY, sampleLoans));
+  const [books, setBooks] = useState<Book[]>([]);
+  const [loans, setLoans] = useState<Loan[]>([]);
   const [section, setSection] = useState<Section>('Biblioteca');
   const [query, setQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('Todas as categorias');
@@ -46,6 +46,7 @@ function App() {
   const [mobileMenu, setMobileMenu] = useState(false);
   const [cloudUser, setCloudUser] = useState<string | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
+  const [cloudDataReadyFor, setCloudDataReadyFor] = useState<string | null>(null);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
@@ -127,30 +128,13 @@ function App() {
       }
       const remoteBooks = (bRes.data ?? []).map((r: {id:string;data:Book}) => r.data);
       const remoteLoans = (lRes.data ?? []).map((r: {id:string;data:Loan}) => r.data);
-      if (remoteBooks.length || remoteLoans.length) {
-        applyRemoteBooks((bRes.data ?? []) as {id:string;data:Book}[]);
-        applyRemoteLoans((lRes.data ?? []) as {id:string;data:Loan}[]);
-      } else {
-        syncedBooksRef.current = [];
-        syncedLoansRef.current = [];
-        // First sign-in on a device: preserve its existing local collection by seeding the cloud.
-        const currentBooks = load<Book[]>(BOOKS_KEY, sampleBooks);
-        const currentLoans = load<Loan[]>(LOANS_KEY, sampleLoans);
-        const bookRows = currentBooks.map(b => ({ id: b.id, user_id: uid, data: b }));
-        const loanRows = currentLoans.map(l => ({ id: l.id, user_id: uid, data: l }));
-        const [bs, ls] = await Promise.all([
-          bookRows.length ? supabase!.from('library_books').upsert(bookRows) : Promise.resolve({error:null}),
-          loanRows.length ? supabase!.from('library_loans').upsert(loanRows) : Promise.resolve({error:null})
-        ]);
-        if (bs.error || ls.error) {
-          setToast('A sincronização automática não conseguiu guardar os dados iniciais.');
-          return;
-        }
-        syncedBooksRef.current = currentBooks;
-        syncedLoansRef.current = currentLoans;
-      }
+      // Cloud is the source of truth for authenticated users. Never seed a new account
+      // from shared browser storage or demo data: an empty account must start empty.
+      applyRemoteBooks((bRes.data ?? []) as {id:string;data:Book}[]);
+      applyRemoteLoans((lRes.data ?? []) as {id:string;data:Loan}[]);
       syncReadyRef.current = true;
       markSynced();
+      setCloudDataReadyFor(cloudUser);
       setToast('Sincronização automática ativa.');
       channel = supabase!.channel('bibliotheca-auto-sync')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'library_books', filter: `user_id=eq.${uid}` }, payload => {
@@ -466,6 +450,8 @@ function App() {
   ];
 
   if (!authChecked) return <div className="auth-loading"><img src={`${import.meta.env.BASE_URL}bibliotheca-logo.png?v=3`} alt="" /><span>A preparar a tua biblioteca…</span></div>;
+
+  if (cloudUser && cloudDataReadyFor !== cloudUser) return <div className="auth-loading"><img src={`${import.meta.env.BASE_URL}bibliotheca-logo.png?v=3`} alt="" /><span>A carregar a tua coleção privada…</span></div>;
 
   if (!cloudUser) return <div className="login-screen">
     <section className="login-panel">
