@@ -490,7 +490,7 @@ function App() {
     <section className="login-visual" aria-label="Interior de uma biblioteca">
       <img className="login-library-image" src="https://unsplash.com/photos/olrbGGnUDxs/download?force=true&w=1920" alt="Interior de uma biblioteca moderna com estantes e escadas" />
       <div className="login-image-shade"/>
-      <div className="login-image-caption"><span>CONHECIMENTO · MEMÓRIA · DESCOBERTA</span><p>Cada livro abre<br/>um novo caminho.</p></div>
+      
       <a className="login-photo-credit" href="https://unsplash.com/pt-br/fotografias/uma-biblioteca-moderna-de-varios-andares-com-inumeras-estantes-e-escadas-olrbGGnUDxs" target="_blank" rel="noreferrer">Fotografia: Unsplash</a>
     </section>
   </div>;
