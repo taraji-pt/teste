@@ -348,50 +348,40 @@ function App() {
 
   async function lookupIsbn(isbn: string, target?: Book) {
     const normalized = isbn.replace(/[^0-9Xx]/g, '').toUpperCase();
-    if (!normalized || !/^\d{9}[\dX]$/.test(normalized) && !/^\d{13}$/.test(normalized)) {
+    if (!normalized || (!/^\\d{9}[\\dX]$/.test(normalized) && !/^\\d{13}$/.test(normalized))) {
       setToast('Introduz um ISBN-10 ou ISBN-13 válido.');
       return;
     }
+    if (!supabase) {
+      setToast('A consulta automática precisa da ligação Supabase configurada.');
+      return;
+    }
+
     setBusyIsbn(true);
     try {
-      const url = 'https://isbnsearch.org/isbn/' + encodeURIComponent(normalized);
-      let res: Response;
-      try {
-        res = await fetch(url, { method: 'GET' });
-      } catch {
-        throw new Error('O navegador não conseguiu aceder ao ISBN Search. O site pode bloquear pedidos externos (CORS ou proteção anti-bot).');
+      const { data, error } = await supabase.functions.invoke('isbn-search', {
+        body: { isbn: normalized }
+      });
+      if (error) {
+        const detail = typeof data?.error === 'string' ? data.error : error.message;
+        throw new Error(detail || 'Não foi possível contactar a função ISBN.');
       }
-      if (!res.ok) throw new Error('O ISBN Search respondeu com HTTP ' + res.status + '.');
-      const html = await res.text();
-      const doc = new DOMParser().parseFromString(html, 'text/html');
-      const heading = doc.querySelector('#book .bookinfo h1')?.textContent?.trim() || '';
-      const bookInfo = doc.querySelector('#book .bookinfo');
-      if (!heading || !bookInfo) {
-        if (doc.querySelector('form#challenge-form, #cf-challenge-running, [name="cf-turnstile-response"]')) {
-          throw new Error('O ISBN Search apresentou uma verificação anti-bot. Não foi possível ler os dados automaticamente.');
-        }
-        setToast('O ISBN Search não encontrou este ISBN. Podes preencher a ficha manualmente.');
-        return;
+      if (!data || typeof data.error === 'string') {
+        const detail = typeof data?.error === 'string' ? data.error : 'Resposta inválida da consulta ISBN.';
+        throw new Error(detail);
       }
-      const getField = (label: string) => {
-        const paragraphs = Array.from(bookInfo.querySelectorAll('p'));
-        const row = paragraphs.find(p => p.querySelector('strong')?.textContent?.trim().replace(/:$/, '').toLowerCase() === label.toLowerCase());
-        return row?.textContent?.replace(/^.*?:/, '').trim() || '';
-      };
-      const authorText = getField('Author');
-      const publisher = getField('Publisher');
-      const yearText = getField('Published');
-      const coverUrl = doc.querySelector('#book .image img')?.getAttribute('src') || '';
+
       const next = target ?? editor ?? emptyBook();
-      const cover = coverUrl ? new URL(coverUrl, url).href.replace(/^http:\/\//i, 'https://') : next.cover;
       const updated: Book = {
         ...next,
-        title: heading || next.title,
-        authors: authorText ? authorText.split(/\s*;\s*|\s*,\s*(?=[A-ZÀ-Ý])/).map(name => name.trim()).filter(Boolean) : next.authors,
-        publisher: publisher || next.publisher,
-        year: yearText.match(/\d{4}/)?.[0] ?? next.year,
+        title: typeof data.title === 'string' && data.title ? data.title : next.title,
+        authors: Array.isArray(data.authors) && data.authors.length
+          ? data.authors.filter((name: unknown): name is string => typeof name === 'string' && Boolean(name.trim()))
+          : next.authors,
+        publisher: typeof data.publisher === 'string' && data.publisher ? data.publisher : next.publisher,
+        year: typeof data.year === 'string' && data.year ? data.year : next.year,
         isbn: normalized,
-        cover
+        cover: typeof data.cover === 'string' && data.cover ? data.cover : next.cover
       };
       setEditor(updated);
       setToast('Metadados obtidos do ISBN Search. Confirma os dados antes de guardar.');
