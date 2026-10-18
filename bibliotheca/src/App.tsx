@@ -55,6 +55,10 @@ function App() {
   const syncedBooksRef = useRef<Book[]>([]);
   const syncedLoansRef = useRef<Loan[]>([]);
   const syncTimerRef = useRef<number | null>(null);
+  const currentBooksRef = useRef<Book[]>(books);
+  const currentLoansRef = useRef<Loan[]>(loans);
+  currentBooksRef.current = books;
+  currentLoansRef.current = loans;
 
   useEffect(() => { localStorage.setItem(BOOKS_KEY, JSON.stringify(books)); }, [books]);
   useEffect(() => { localStorage.setItem(LOANS_KEY, JSON.stringify(loans)); }, [loans]);
@@ -207,6 +211,67 @@ function App() {
     }, 700);
     return () => { if (syncTimerRef.current) window.clearTimeout(syncTimerRef.current); };
   }, [books, loans, cloudUser]);
+  // Realtime provides fast updates when available; polling/focus refresh is a fallback.
+  useEffect(() => {
+    if (!supabase || !cloudUser || !syncReadyRef.current) return;
+    let stopped = false;
+    let refreshing = false;
+
+    const sameById = <T extends { id: string }>(a: T[], b: T[]) => {
+      const sort = (items: T[]) => [...items].sort((x, y) => x.id.localeCompare(y.id));
+      return JSON.stringify(sort(a)) === JSON.stringify(sort(b));
+    };
+
+    const refreshFromCloud = async () => {
+      if (stopped || refreshing || document.visibilityState === 'hidden') return;
+      refreshing = true;
+      try {
+        const { data: userData } = await supabase!.auth.getUser();
+        const uid = userData.user?.id;
+        if (!uid || stopped) return;
+        const [bRes, lRes] = await Promise.all([
+          supabase!.from('library_books').select('id,data').eq('user_id', uid),
+          supabase!.from('library_loans').select('id,data').eq('user_id', uid)
+        ]);
+        if (stopped || bRes.error || lRes.error) return;
+        const remoteBooks = (bRes.data ?? []).map((r: {id:string;data:Book}) => r.data);
+        const remoteLoans = (lRes.data ?? []).map((r: {id:string;data:Loan}) => r.data);
+
+        // Apply each collection only when this device has no unsaved local changes to it.
+        const booksAreLocallyDirty = !sameById(currentBooksRef.current, syncedBooksRef.current);
+        const loansAreLocallyDirty = !sameById(currentLoansRef.current, syncedLoansRef.current);
+        if (!booksAreLocallyDirty && !sameById(remoteBooks, syncedBooksRef.current)) {
+          syncedBooksRef.current = remoteBooks;
+          syncingRemoteRef.current = true;
+          setBooks(remoteBooks);
+          window.setTimeout(() => { syncingRemoteRef.current = false; }, 0);
+        }
+        if (!loansAreLocallyDirty && !sameById(remoteLoans, syncedLoansRef.current)) {
+          syncedLoansRef.current = remoteLoans;
+          syncingRemoteRef.current = true;
+          setLoans(remoteLoans);
+          window.setTimeout(() => { syncingRemoteRef.current = false; }, 0);
+        }
+      } catch {
+        // Temporary network failures are retried on the next poll or focus event.
+      } finally {
+        refreshing = false;
+      }
+    };
+
+    const interval = window.setInterval(() => { void refreshFromCloud(); }, 10000);
+    const onReturn = () => { if (document.visibilityState === 'visible') void refreshFromCloud(); };
+    window.addEventListener('focus', onReturn);
+    document.addEventListener('visibilitychange', onReturn);
+    void refreshFromCloud();
+    return () => {
+      stopped = true;
+      window.clearInterval(interval);
+      window.removeEventListener('focus', onReturn);
+      document.removeEventListener('visibilitychange', onReturn);
+    };
+  }, [cloudUser]);
+
   useEffect(() => {
     if (!toast) return;
     const t = window.setTimeout(() => setToast(''), 3000);
