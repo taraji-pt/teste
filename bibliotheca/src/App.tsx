@@ -77,7 +77,7 @@ function App() {
     setLastSyncAt(cloudUser ? localStorage.getItem(`bibliotheca-last-sync-${cloudUser}`) : null);
   }, [cloudUser]);
   useEffect(() => {
-    if (!supabase) return;
+    if (!supabase) { setAuthChecked(true); return; }
     supabase.auth.getSession().then(({ data, error }) => {
       if (!error) setCloudUser(data.session?.user.email ?? null);
       setAuthChecked(true);
