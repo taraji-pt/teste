@@ -48,6 +48,7 @@ function App() {
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [showAuth, setShowAuth] = useState(false);
+  const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const syncReadyRef = useRef(false);
@@ -59,9 +60,21 @@ function App() {
   const currentLoansRef = useRef<Loan[]>(loans);
   currentBooksRef.current = books;
   currentLoansRef.current = loans;
+  const syncStorageKey = cloudUser ? `bibliotheca-last-sync-${cloudUser}` : null;
+  const markSynced = () => {
+    const timestamp = new Date().toISOString();
+    if (syncStorageKey) localStorage.setItem(syncStorageKey, timestamp);
+    setLastSyncAt(timestamp);
+  };
+  const formatSyncTime = (value: string | null) => value
+    ? new Intl.DateTimeFormat('pt-PT', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value))
+    : null;
 
   useEffect(() => { localStorage.setItem(BOOKS_KEY, JSON.stringify(books)); }, [books]);
   useEffect(() => { localStorage.setItem(LOANS_KEY, JSON.stringify(loans)); }, [loans]);
+  useEffect(() => {
+    setLastSyncAt(cloudUser ? localStorage.getItem(`bibliotheca-last-sync-${cloudUser}`) : null);
+  }, [cloudUser]);
   useEffect(() => {
     if (!supabase) return;
     supabase.auth.getSession().then(({ data }) => setCloudUser(data.session?.user.email ?? null));
@@ -129,6 +142,7 @@ function App() {
         syncedLoansRef.current = currentLoans;
       }
       syncReadyRef.current = true;
+      markSynced();
       setToast('Sincronização automática ativa.');
       channel = supabase!.channel('bibliotheca-auto-sync')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'library_books', filter: `user_id=eq.${uid}` }, payload => {
@@ -138,6 +152,7 @@ function App() {
             syncedBooksRef.current = next;
             syncingRemoteRef.current = true;
             setBooks(next);
+            markSynced();
             window.setTimeout(() => { syncingRemoteRef.current = false; }, 0);
           } else {
             const row = payload.new as {id:string;data:Book};
@@ -146,6 +161,7 @@ function App() {
             syncedBooksRef.current = next;
             syncingRemoteRef.current = true;
             setBooks(next);
+            markSynced();
             window.setTimeout(() => { syncingRemoteRef.current = false; }, 0);
           }
         })
@@ -156,6 +172,7 @@ function App() {
             syncedLoansRef.current = next;
             syncingRemoteRef.current = true;
             setLoans(next);
+            markSynced();
             window.setTimeout(() => { syncingRemoteRef.current = false; }, 0);
           } else {
             const row = payload.new as {id:string;data:Loan};
@@ -164,6 +181,7 @@ function App() {
             syncedLoansRef.current = next;
             syncingRemoteRef.current = true;
             setLoans(next);
+            markSynced();
             window.setTimeout(() => { syncingRemoteRef.current = false; }, 0);
           }
         })
@@ -207,6 +225,7 @@ function App() {
       if (tasks.length) {
         const results = await Promise.all(tasks);
         if (results.some(result => result.error)) setToast('Erro ao sincronizar automaticamente. Verifica a ligação.');
+        else markSynced();
       }
     }, 700);
     return () => { if (syncTimerRef.current) window.clearTimeout(syncTimerRef.current); };
@@ -244,12 +263,14 @@ function App() {
           syncedBooksRef.current = remoteBooks;
           syncingRemoteRef.current = true;
           setBooks(remoteBooks);
+          markSynced();
           window.setTimeout(() => { syncingRemoteRef.current = false; }, 0);
         }
         if (!loansAreLocallyDirty && !sameById(remoteLoans, syncedLoansRef.current)) {
           syncedLoansRef.current = remoteLoans;
           syncingRemoteRef.current = true;
           setLoans(remoteLoans);
+          markSynced();
           window.setTimeout(() => { syncingRemoteRef.current = false; }, 0);
         }
       } catch {
@@ -359,7 +380,7 @@ function App() {
   function exportData() {
     const blob = new Blob([JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), books, loans }, null, 2)], {type:'application/json'});
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = `bibliotheca-backup-${new Date().toISOString().slice(0,10)}.json`; a.click();
+    const a = document.createElement('a'); a.href = url; a.download = `BiblioTTheca-backup-${new Date().toISOString().slice(0,10)}.json`; a.click();
     URL.revokeObjectURL(url);
   }
   function importData(file?: File) {
@@ -372,7 +393,7 @@ function App() {
         if (window.confirm(`Importar ${data.books.length} livros e ${data.loans.length} empréstimos? Os dados atuais serão substituídos.`)) {
           setBooks(data.books); setLoans(data.loans); setToast('Biblioteca importada.');
         }
-      } catch { setToast('Ficheiro inválido. Escolhe uma cópia Bibliotheca JSON.'); }
+      } catch { setToast('Ficheiro inválido. Escolhe uma cópia BiblioTTheca JSON.'); }
     };
     reader.readAsText(file);
   }
@@ -402,7 +423,7 @@ function App() {
 
   return <div className="app-shell">
     <aside className={`sidebar ${mobileMenu ? 'open' : ''}`}>
-      <div className="brand"><div className="brand-mark"><BookOpen size={22}/></div><div><strong>Bibliotheca</strong><small>Biblioteca teológica</small></div><button className="icon-btn close-menu" onClick={() => setMobileMenu(false)}><X size={18}/></button></div>
+      <div className="brand"><div className="brand-mark"><BookOpen size={22}/></div><div><strong>BiblioTTheca</strong><small>Gestão de biblioteca pessoal</small></div><button className="icon-btn close-menu" onClick={() => setMobileMenu(false)}><X size={18}/></button></div>
       <div className="side-label">A MINHA COLEÇÃO</div>
       <nav>{navItems.map(item => <button key={item.label} className={`nav-item ${section===item.label?'active':''}`} onClick={() => {setSection(item.label);setMobileMenu(false);}}><item.icon size={18}/><span>{item.label}</span>{item.label==='Biblioteca'&&<span className="nav-count">{books.length}</span>}</button>)}</nav>
       <div className="side-label section-label">COLEÇÕES</div>
@@ -410,7 +431,7 @@ function App() {
       <button className="nav-item" onClick={() => {setSection('Biblioteca');setCategoryFilter('Comentários bíblicos');}}><span className="collection-dot ochre"/>Comentários bíblicos</button>
       <button className="nav-item" onClick={() => {setSection('Biblioteca');setCategoryFilter('Tradição baptista');}}><span className="collection-dot blue"/>Tradição baptista</button>
       <div className="sidebar-bottom">
-        <div className="sync-card"><div className="sync-icon">{cloudConfigured?<Cloud size={18}/>:<CloudOff size={18}/>}</div><div><strong>{cloudConfigured?'Sincronização disponível':'Modo local'}</strong><small>{cloudUser||'Dados neste dispositivo'}</small></div><button className="tiny-icon" title="Configurar sincronização" onClick={() => setShowAuth(v=>!v)}><Settings size={15}/></button></div>
+        <div className="sync-card"><div className="sync-icon">{cloudConfigured?<Cloud size={18}/>:<CloudOff size={18}/>}</div><div className="sync-copy"><strong>{!cloudConfigured?'Nuvem indisponível':!cloudUser?'Sessão não iniciada':'Última sincronização'}</strong><small>{!cloudConfigured?'Verifica a configuração':!cloudUser?'Inicia sessão para sincronizar':formatSyncTime(lastSyncAt) || 'A aguardar sincronização'}</small></div><button className="tiny-icon" title="Conta e sincronização" onClick={() => setShowAuth(v=>!v)}><Settings size={15}/></button></div>
         <button className="nav-item" onClick={exportData}><Download size={17}/>Exportar cópia</button>
         <button className="nav-item" onClick={() => fileRef.current?.click()}><Upload size={17}/>Importar cópia</button>
         <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={e=>{importData(e.target.files?.[0]);e.currentTarget.value='';}}/>
@@ -420,7 +441,7 @@ function App() {
     <main className="main">
       <header className="topbar">
         <button className="icon-btn mobile-menu-btn" onClick={() => setMobileMenu(true)}><Menu size={20}/></button>
-        <div className="breadcrumbs"><span>Bibliotheca</span><span className="crumb-slash">/</span><strong>{section}</strong></div>
+        <div className="breadcrumbs"><span>BiblioTTheca</span><span className="crumb-slash">/</span><strong>{section}</strong></div>
         <div className="top-actions"><span className={`cloud-status ${cloudConfigured?'ready':''}`}><span className="status-dot"/>{cloudConfigured?'Nuvem configurável':'Só neste dispositivo'}</span><button className="avatar" onClick={() => setShowAuth(v=>!v)} title="Conta">TT</button></div>
       </header>
       {showAuth && <div className="auth-panel">
@@ -442,7 +463,7 @@ function App() {
         {section==='Categorias' && <><div className="page-heading"><div><div className="eyebrow">ORGANIZAÇÃO</div><h1>Temas e <em>disciplinas.</em></h1><p className="subtitle">Explora a coleção por área de estudo.</p></div></div><div className="category-grid">{categories.map((cat,i)=>{const count=books.filter(b=>b.category===cat).length;return <button className="category-card" key={cat} onClick={()=>{setCategoryFilter(cat);setSection('Biblioteca');}}><div className={`category-icon tone-${i%5}`}><Tags size={20}/></div><div className="category-info"><strong>{cat}</strong><small>{count} {count===1?'livro':'livros'}</small></div><ArrowUpRight size={17}/></button>})}</div></>}
         {section==='Autores' && <><div className="page-heading"><div><div className="eyebrow">ÍNDICE ONOMÁSTICO</div><h1>Autores e <em>pensadores.</em></h1><p className="subtitle">Os autores presentes na tua biblioteca.</p></div></div><div className="authors-list">{authors.map(author=>{const count=books.filter(b=>b.authors.includes(author)).length;return <button className="author-row" key={author} onClick={()=>{setQuery(author);setSection('Biblioteca');}}><div className="author-avatar">{author.split(' ').map(p=>p[0]).slice(0,2).join('')}</div><strong>{author}</strong><span>{count} {count===1?'livro':'livros'}</span><ArrowUpRight size={16}/></button>})}{!authors.length&&<div className="empty-state">Os autores aparecerão aqui quando adicionares livros.</div>}</div></>}
         {section==='Empréstimos' && <><div className="page-heading"><div><div className="eyebrow">GESTÃO DA COLEÇÃO</div><h1>Livros em <em>circulação.</em></h1><p className="subtitle">Acompanha os livros emprestados e as datas de devolução.</p></div></div><div className="loan-list">{loans.length===0?<div className="empty-state"><Users size={30}/><h3>Sem empréstimos registados</h3><p>Na ficha de um livro, escolhe “Emprestar”.</p></div>:loans.slice().sort((a,b)=>Number(Boolean(a.returnedAt))-Number(Boolean(b.returnedAt))).map(loan=>{const book=books.find(b=>b.id===loan.bookId);return <div className="loan-row" key={loan.id}><div className="mini-cover">{book?.cover?<img src={book.cover} alt=""/>:<BookOpen size={20}/>}</div><div className="loan-main"><strong>{book?.title||'Livro removido'}</strong><small>Emprestado a {loan.borrower} · {loan.lentAt}</small>{loan.dueAt&&<small>Devolução prevista: {loan.dueAt}</small>}</div><span className={`loan-status ${loan.returnedAt?'returned':loan.dueAt&&loan.dueAt<new Date().toISOString().slice(0,10)?'late':''}`}>{loan.returnedAt?'Devolvido':loan.dueAt&&loan.dueAt<new Date().toISOString().slice(0,10)?'Atrasado':'Emprestado'}</span>{!loan.returnedAt&&<button className="btn secondary compact" onClick={()=>{setLoans(prev=>prev.map(l=>l.id===loan.id?{...l,returnedAt:new Date().toISOString().slice(0,10)}:l));setToast('Devolução registada.')}}><CircleCheck size={15}/>Devolvido</button>}</div>})}</div></>}
-        <footer className="footer"><span>Bibliotheca <span className="footer-dot">·</span> Biblioteca privada</span><span>{cloudUser?'Conta ligada':'Os teus livros, ao teu ritmo.'}</span></footer>
+        <footer className="footer"><span>BiblioTTheca <span className="footer-dot">·</span> Biblioteca privada</span><span>{cloudUser?'Conta ligada':'Os teus livros, ao teu ritmo.'}</span></footer>
       </div>
     </main>
     {editor&&<BookModal book={editor} busyIsbn={busyIsbn} onClose={()=>setEditor(null)} onSave={saveBook} onChange={setEditor} onLookup={()=>lookupIsbn(editor.isbn,editor)} onScan={()=>{setScanMessage('');setScanOpen(true);}}/>}
