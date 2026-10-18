@@ -1,11 +1,21 @@
 {
+  "id": "/teste/bibliotheca/",
   "name": "BiblioTTheca — Gestão de Biblioteca Pessoal",
   "short_name": "BiblioTTheca",
   "description": "Gestão de biblioteca pessoal",
+  "lang": "pt-PT",
   "start_url": "/teste/bibliotheca/",
+  "scope": "/teste/bibliotheca/",
   "display": "standalone",
+  "orientation": "any",
   "background_color": "#f5f3ed",
-  "theme_color": "#20362e",
-  "icons": [],
-  "scope": "/teste/bibliotheca/"
+  "theme_color": "#263a31",
+  "icons": [
+    {
+      "src": "/teste/bibliotheca/bibliotheca-logo.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
 }
