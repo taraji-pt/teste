@@ -46,6 +46,7 @@ function App() {
   const [mobileMenu, setMobileMenu] = useState(false);
   const [cloudUser, setCloudUser] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState<string | null>(null);
+  const [displayNameDraft, setDisplayNameDraft] = useState('');
   const [authChecked, setAuthChecked] = useState(false);
   const [cloudDataReadyFor, setCloudDataReadyFor] = useState<string | null>(null);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
@@ -79,6 +80,7 @@ function App() {
   useEffect(() => {
     setLastSyncAt(cloudUser ? localStorage.getItem(`bibliotheca-last-sync-${cloudUser}`) : null);
   }, [cloudUser]);
+  useEffect(() => { setDisplayNameDraft(displayName ?? ''); }, [displayName]);
   useEffect(() => {
     if (!supabase) { setAuthChecked(true); return; }
     const nameFromUser = (user: { user_metadata?: Record<string, unknown> } | null | undefined) => {
@@ -394,6 +396,17 @@ function App() {
     } else setDisplayName(null);
   }
 
+  async function saveDisplayName() {
+    if (!supabase || !cloudUser) return;
+    const name = displayNameDraft.trim();
+    if (!name) { setToast('Introdu um nome de apresentação.'); return; }
+    const { data, error } = await supabase.auth.updateUser({ data: { display_name: name } });
+    if (error) { setToast(`Não foi possível guardar o nome: ${error.message}`); return; }
+    const savedName = data.user?.user_metadata?.display_name;
+    setDisplayName(typeof savedName === 'string' && savedName.trim() ? savedName.trim() : name);
+    setToast('Nome de apresentação atualizado.');
+  }
+
   async function auth() {
     if (!supabase) { setToast('A autenticação não está configurada.'); return; }
     if (cloudUser) {
@@ -531,6 +544,7 @@ function App() {
         <div className="auth-head"><div><strong>Sincronização privada</strong><small>{!cloudConfigured?'Configuração Supabase necessária.':cloudUser?`Sessão iniciada como ${cloudUser}.`:'Liga-te à tua conta para sincronizar.'}</small></div><button className="icon-btn" onClick={()=>setShowAuth(false)}><X size={17}/></button></div>
         {!cloudConfigured ? <p className="muted small">Cria um projeto Supabase, configura as variáveis VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY e executa o ficheiro <code>supabase/schema.sql</code>.</p> : <>
           {!cloudUser && <><input className="field" placeholder="Email" value={authEmail} onChange={e=>setAuthEmail(e.target.value)}/><input className="field" placeholder="Palavra-passe" type="password" value={authPassword} onChange={e=>setAuthPassword(e.target.value)}/></>}
+          {cloudUser && <div className="display-name-editor"><label className="muted small" htmlFor="display-name-input">Nome apresentado no botão</label><input id="display-name-input" className="field" value={displayNameDraft} onChange={e=>setDisplayNameDraft(e.target.value)} placeholder="O teu nome"/><div className="button-row"><button className="btn secondary" onClick={() => void saveDisplayName()}>Guardar nome</button></div></div>}
           <div className="button-row"><button className={cloudUser ? "btn logout-glow" : "btn secondary"} onClick={auth}>{cloudUser?'Terminar sessão':'Iniciar sessão'}</button></div>{cloudUser&&<p className="muted small">Sessão ativa. Os livros e empréstimos são sincronizados automaticamente entre os teus dispositivos.</p>}
         </>}
       </div>}
