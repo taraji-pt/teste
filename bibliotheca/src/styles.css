@@ -88,7 +88,7 @@
 
 
 .book-modal-footer{display:flex;align-items:center;justify-content:space-between;gap:14px}
-.isbnsearch-link{display:inline-flex;align-items:center;gap:5px;color:#54735b;font-size:10px;font-weight:600;text-decoration:none}
-.isbnsearch-link:hover{color:#263f2f;text-decoration:underline}
+.isbnsearch-link{display:inline-flex;align-items:center;gap:4px;align-self:flex-start;color:var(--text-muted, #777);font-family:inherit;font-size:11px;font-weight:400;text-align:left;text-decoration:none;opacity:.8}
+.isbnsearch-link:hover{color:var(--text-color, #444);opacity:1;text-decoration:underline}
 .book-modal-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px}
-@media(max-width:600px){.book-modal-footer{align-items:stretch;flex-direction:column-reverse}.book-modal-actions{width:100%}.book-modal-actions .btn{flex:1}.isbnsearch-link{justify-content:center;padding:7px 0}}
+@media(max-width:600px){.book-modal-footer{align-items:stretch;flex-direction:column-reverse}.book-modal-actions{width:100%}.book-modal-actions .btn{flex:1}.isbnsearch-link{align-self:flex-start;justify-content:flex-start;padding:2px 0}}
