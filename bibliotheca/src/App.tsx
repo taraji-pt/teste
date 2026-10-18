@@ -348,42 +348,59 @@ function App() {
 
   async function lookupIsbn(isbn: string, target?: Book) {
     const normalized = isbn.replace(/[^0-9Xx]/g, '').toUpperCase();
-    if (!normalized) { setToast('Introduz um ISBN válido.'); return; }
+    if (!normalized || !/^\\d{9}[\\dX]$/.test(normalized) && !/^\\d{13}$/.test(normalized)) {
+      setToast('Introduz um ISBN-10 ou ISBN-13 válido.');
+      return;
+    }
     setBusyIsbn(true);
     try {
-      const url = 'https://www.googleapis.com/books/v1/volumes?q=isbn:' + encodeURIComponent(normalized) + '&maxResults=5';
-      const res = await fetch(url);
-      const raw = await res.text();
-      let data: any;
-      try { data = JSON.parse(raw); }
-      catch { throw new Error('Resposta inválida do Google Books (HTTP ' + res.status + ').'); }
-      if (!res.ok) throw new Error(data.error?.message || ('Google Books respondeu com HTTP ' + res.status + '.'));
-      const items = Array.isArray(data.items) ? data.items : [];
-      const item = items.find((entry: any) => entry.volumeInfo?.industryIdentifiers?.some((identifier: any) =>
-        identifier.identifier?.replace(/[^0-9Xx]/g, '').toUpperCase() === normalized
-      )) ?? items[0];
-      const info = item?.volumeInfo;
-      if (!info) {
-        setToast('O Google Books não encontrou este ISBN. Podes preencher a ficha manualmente.');
+      const url = 'https://isbnsearch.org/isbn/' + encodeURIComponent(normalized);
+      let res: Response;
+      try {
+        res = await fetch(url, { method: 'GET' });
+      } catch {
+        throw new Error('O navegador não conseguiu aceder ao ISBN Search. O site pode bloquear pedidos externos (CORS ou proteção anti-bot).');
+      }
+      if (!res.ok) throw new Error('O ISBN Search respondeu com HTTP ' + res.status + '.');
+      const html = await res.text();
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const heading = doc.querySelector('#book .bookinfo h1')?.textContent?.trim() || '';
+      const bookInfo = doc.querySelector('#book .bookinfo');
+      if (!heading || !bookInfo) {
+        if (doc.querySelector('form#challenge-form, #cf-challenge-running, [name="cf-turnstile-response"]')) {
+          throw new Error('O ISBN Search apresentou uma verificação anti-bot. Não foi possível ler os dados automaticamente.');
+        }
+        setToast('O ISBN Search não encontrou este ISBN. Podes preencher a ficha manualmente.');
         return;
       }
+      const getField = (label: string) => {
+        const paragraphs = Array.from(bookInfo.querySelectorAll('p'));
+        const row = paragraphs.find(p => p.querySelector('strong')?.textContent?.trim().replace(/:$/, '').toLowerCase() === label.toLowerCase());
+        return row?.textContent?.replace(/^.*?:/, '').trim() || '';
+      };
+      const authorText = getField('Author');
+      const publisher = getField('Publisher');
+      const yearText = getField('Published');
+      const coverUrl = doc.querySelector('#book .image img')?.getAttribute('src') || '';
       const next = target ?? editor ?? emptyBook();
-      const coverUrl = info.imageLinks?.thumbnail || info.imageLinks?.smallThumbnail || '';
+      const cover = coverUrl ? new URL(coverUrl, url).href.replace(/^http:\/\//i, 'https://') : next.cover;
       const updated: Book = {
         ...next,
-        title: info.title || next.title,
-        authors: Array.isArray(info.authors) && info.authors.length ? info.authors : next.authors,
-        publisher: info.publisher || next.publisher,
-        year: info.publishedDate?.match(/\d{4}/)?.[0] ?? next.year,
+        title: heading || next.title,
+        authors: authorText ? authorText.split(/\\s*;\\s*|\\s*,\\s*(?=[A-ZÀ-Ý])/).map(name => name.trim()).filter(Boolean) : next.authors,
+        publisher: publisher || next.publisher,
+        year: yearText.match(/\\d{4}/)?.[0] ?? next.year,
         isbn: normalized,
-        cover: coverUrl ? coverUrl.replace(/^http:\/\//i, 'https://').replace(/&amp;/g, '&') : next.cover
+        cover
       };
       setEditor(updated);
-      setToast('Metadados encontrados no Google Books. Confirma os dados antes de guardar.');
+      setToast('Metadados obtidos do ISBN Search. Confirma os dados antes de guardar.');
     } catch (error) {
       const detail = error instanceof Error ? error.message : 'erro desconhecido';
-      setToast('Erro ao consultar Google Books: ' + detail);
-    } finally { setBusyIsbn(false); }
+      setToast('Erro ao consultar ISBN Search: ' + detail);
+    } finally {
+      setBusyIsbn(false);
+    }
   }
 
   async function refreshAuthState() {
