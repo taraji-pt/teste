@@ -359,7 +359,7 @@ function App() {
       catch { throw new Error('Resposta inválida do Google Books (HTTP ' + res.status + ').'); }
       if (!res.ok) throw new Error(data.error?.message || ('Google Books respondeu com HTTP ' + res.status + '.'));
       const items = Array.isArray(data.items) ? data.items : [];
-      const item = items.find(entry => entry.volumeInfo?.industryIdentifiers?.some(identifier =>
+      const item = items.find((entry: any) => entry.volumeInfo?.industryIdentifiers?.some((identifier: any) =>
         identifier.identifier?.replace(/[^0-9Xx]/g, '').toUpperCase() === normalized
       )) ?? items[0];
       const info = item?.volumeInfo;
