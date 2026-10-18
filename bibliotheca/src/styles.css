@@ -56,3 +56,19 @@
 .login-photo-credit:hover{text-decoration:underline}
 @media(max-width:900px){.login-screen{grid-template-columns:minmax(330px,44%) 1fr}.login-panel{padding:30px 25px 20px}.login-brand img{width:54px;height:54px}.login-brand strong{font-size:24px}.login-intro h1{font-size:32px}.login-features{gap:13px}.login-features small{font-size:10px}}
 @media(max-width:680px){.login-screen{display:flex;flex-direction:column}.login-panel{min-height:auto;padding:24px 23px 18px}.login-brand img{width:50px;height:50px}.login-intro{margin-top:28px}.login-intro h1{font-size:34px}.login-intro p{font-size:15px}.login-features{grid-template-columns:1fr 1fr;gap:16px 10px;margin:24px 0}.login-features>div{align-items:flex-start;gap:8px}.login-features svg{width:18px;height:18px}.login-features strong{font-size:12px}.login-features small{font-size:10px;line-height:1.4}.login-form{margin-top:4px;padding:16px}.login-footer{margin-top:20px}.login-visual{min-height:250px;height:30vh;max-height:340px;order:-1;display:block}.login-image-caption{left:24px;bottom:34px}.login-image-caption p{font-size:30px}.login-image-caption span{font-size:8px}}
+
+/* Landing-page sign-in modal */
+.login-cta{margin-top:auto;max-width:420px;width:100%;padding-top:28px}
+.login-modal-backdrop{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(9,22,30,.62);backdrop-filter:blur(5px)}
+.login-modal{width:min(100%,420px);padding:26px;border:1px solid #e5dece;border-radius:18px;background:#fbf8f0;box-shadow:0 24px 80px rgba(0,0,0,.28);animation:login-modal-in .18s ease-out}
+.login-modal-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:22px}
+.login-modal-heading .login-form-title{font-family:'Playfair Display',serif;font-size:23px;font-weight:600;margin:0;color:#102b3b}
+.login-modal-heading p{font-size:12px;color:#697078;margin:7px 0 0;line-height:1.5}
+.login-modal-close{display:grid;place-items:center;flex:0 0 34px;width:34px;height:34px;border:1px solid #e1dbce;border-radius:50%;background:transparent;color:#34434b;cursor:pointer}
+.login-modal-close:hover{background:#f0e9da}
+.login-modal label{display:block;font-size:12px;font-weight:600;color:#4d5961;margin-bottom:14px}
+.login-modal .field{display:block;width:100%;margin-top:7px;padding:12px;background:#fffdf8;border-color:#e1dbce;border-radius:9px;font-size:13px}
+.login-modal .login-submit{margin-top:18px;cursor:pointer}
+.login-modal .login-private{margin-top:17px}
+@keyframes login-modal-in{from{opacity:0;transform:translateY(8px) scale(.99)}to{opacity:1;transform:translateY(0) scale(1)}}
+@media(max-width:680px){.login-cta{padding-top:18px}.login-modal{padding:22px;border-radius:16px}.login-modal-backdrop{padding:16px}}
