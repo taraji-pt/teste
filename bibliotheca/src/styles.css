@@ -10,3 +10,6 @@
 .brand small{font-size:10px;line-height:1.35;max-width:145px}
 .sync-card .sync-copy{min-width:0;flex:1}
 .sync-card .sync-copy small{max-width:none;white-space:normal;overflow-wrap:anywhere}
+
+.sync-card-button{width:100%;text-align:left;background:transparent;color:inherit;cursor:pointer;font:inherit}
+.sync-card-button:hover{background:#f4f2e9;border-color:#cfcec2}
