@@ -374,7 +374,6 @@ function App() {
     }
     const email = data.session?.user.email ?? null;
     setCloudUser(email);
-    setShowAuth(true);
     if (email) {
       const { data: userData } = await supabase.auth.getUser();
       setCloudUser(userData.user?.email ?? email);
@@ -401,7 +400,7 @@ function App() {
     const { data } = await supabase.auth.getSession();
     setCloudUser(data.session?.user.email ?? null);
     setAuthChecked(true);
-    setShowAuth(true);
+    setShowAuth(false);
     setAuthPassword('');
     setToast(data.session ? 'Sessão iniciada.' : 'Não foi possível confirmar a sessão.');
   }
@@ -508,7 +507,7 @@ function App() {
       <header className="topbar">
         <button className="icon-btn mobile-menu-btn" onClick={() => setMobileMenu(true)}><Menu size={20}/></button>
         <div className="breadcrumbs"><span>BiblioTTheca</span><span className="crumb-slash">/</span><strong>{section}</strong></div>
-        <div className="top-actions"><span className={`cloud-status ${cloudConfigured?'ready':''}`}><span className="status-dot"/>{cloudConfigured?'Nuvem configurável':'Só neste dispositivo'}</span><button className="avatar" onClick={() => void refreshAuthState()} title="Atualizar conta">TT</button></div>
+        <div className="top-actions"><button type="button" className={`live-toggle ${cloudUser ? 'is-live' : 'is-off'}`} onClick={() => { if (showAuth) setShowAuth(false); else void refreshAuthState(); }} aria-expanded={showAuth} aria-label="Detalhes da sessão">{cloudUser ? 'LIVE' : cloudConfigured ? 'ON' : 'OFF'}</button></div>
       </header>
       {showAuth && <div className="auth-panel">
         <div className="auth-head"><div><strong>Sincronização privada</strong><small>{!cloudConfigured?'Configuração Supabase necessária.':cloudUser?`Sessão iniciada como ${cloudUser}.`:'Liga-te à tua conta para sincronizar.'}</small></div><button className="icon-btn" onClick={()=>setShowAuth(false)}><X size={17}/></button></div>
