@@ -45,6 +45,7 @@ function App() {
   const [toast, setToast] = useState('');
   const [mobileMenu, setMobileMenu] = useState(false);
   const [cloudUser, setCloudUser] = useState<string | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [showAuth, setShowAuth] = useState(false);
@@ -77,8 +78,14 @@ function App() {
   }, [cloudUser]);
   useEffect(() => {
     if (!supabase) return;
-    supabase.auth.getSession().then(({ data }) => setCloudUser(data.session?.user.email ?? null));
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => setCloudUser(session?.user.email ?? null));
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (!error) setCloudUser(data.session?.user.email ?? null);
+      setAuthChecked(true);
+    }).catch(() => setAuthChecked(true));
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setCloudUser(session?.user.email ?? null);
+      setAuthChecked(true);
+    });
     return () => listener.subscription.unsubscribe();
   }, []);
   useEffect(() => {
@@ -390,7 +397,7 @@ function App() {
   }
 
   async function auth() {
-    if (!supabase) return;
+    if (!supabase) { setToast('A autenticação não está configurada.'); return; }
     if (cloudUser) {
       const result = await supabase.auth.signOut();
       if (result.error) setToast(result.error.message);
@@ -408,6 +415,7 @@ function App() {
     }
     const { data } = await supabase.auth.getSession();
     setCloudUser(data.session?.user.email ?? null);
+    setAuthChecked(true);
     setShowAuth(true);
     setAuthPassword('');
     setToast(data.session ? 'Sessão iniciada.' : 'Não foi possível confirmar a sessão.');
@@ -455,6 +463,37 @@ function App() {
     { label: 'Empréstimos' as Section, icon: Users },
     { label: 'Autores' as Section, icon: Bookmark }
   ];
+
+  if (!authChecked) return <div className="auth-loading"><img src={`${import.meta.env.BASE_URL}bibliotheca-logo.png?v=3`} alt="" /><span>A preparar a tua biblioteca…</span></div>;
+
+  if (!cloudUser) return <div className="login-screen">
+    <section className="login-panel">
+      <div className="login-brand"><img src={`${import.meta.env.BASE_URL}bibliotheca-logo.png?v=3`} alt="" /><div><strong>Biblio<span>TTheca</span></strong><small>Gestão de biblioteca pessoal</small></div></div>
+      <div className="login-intro"><div className="login-kicker">O TEU ESPAÇO DE LEITURA</div><h1>Uma biblioteca de <em>sabedoria.</em></h1><p>Organiza, descobre e acompanha a tua coleção de livros — onde quer que estejas.</p></div>
+      <div className="login-features">
+        <div><BookOpen/><span><strong>Catálogo pessoal</strong><small>Todos os teus livros num só lugar</small></span></div>
+        <div><Tags/><span><strong>Categorias e autores</strong><small>Encontra facilmente o que procuras</small></span></div>
+        <div><Clock3/><span><strong>Empréstimos</strong><small>Acompanha os livros emprestados</small></span></div>
+        <div><Cloud/><span><strong>Sincronização na nuvem</strong><small>Acesso entre os teus dispositivos</small></span></div>
+      </div>
+      <form className="login-form" onSubmit={e=>{e.preventDefault();void auth();}}>
+        <div className="login-form-title">Entra na tua biblioteca</div>
+        {!cloudConfigured ? <p className="login-config-note">A autenticação ainda não está configurada. Verifica as definições do Supabase.</p> : <>
+          <label>Email<input className="field" type="email" autoComplete="username" placeholder="nome@exemplo.com" value={authEmail} onChange={e=>setAuthEmail(e.target.value)} required /></label>
+          <label>Palavra-passe<input className="field" type="password" autoComplete="current-password" placeholder="A tua palavra-passe" value={authPassword} onChange={e=>setAuthPassword(e.target.value)} required /></label>
+          <button className="login-submit" type="submit"><Users size={17}/>Iniciar sessão<ArrowUpRight size={17}/></button>
+        </>}
+        <p className="login-private"><Cloud size={14}/> A tua coleção é privada e sincronizada em segurança.</p>
+      </form>
+      <footer className="login-footer">© Tiago Terraquente, 2026</footer>
+    </section>
+    <section className="login-visual" aria-label="Interior de uma biblioteca">
+      <img className="login-library-image" src="https://unsplash.com/photos/olrbGGnUDxs/download?force=true&w=1920" alt="Interior de uma biblioteca moderna com estantes e escadas" />
+      <div className="login-image-shade"/>
+      <div className="login-image-caption"><span>CONHECIMENTO · MEMÓRIA · DESCOBERTA</span><p>Cada livro abre<br/>um novo caminho.</p></div>
+      <a className="login-photo-credit" href="https://unsplash.com/pt-br/fotografias/uma-biblioteca-moderna-de-varios-andares-com-inumeras-estantes-e-escadas-olrbGGnUDxs" target="_blank" rel="noreferrer">Fotografia: Unsplash</a>
+    </section>
+  </div>;
 
   return <div className="app-shell">
     <aside className={`sidebar ${mobileMenu ? 'open' : ''}`}>
