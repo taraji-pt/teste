@@ -427,7 +427,7 @@ function App() {
   const navItems = [
     { label: 'Biblioteca' as Section, icon: BookOpen, count: books.length },
     { label: 'Categorias' as Section, icon: Tags, count: userCategories.length },
-    { label: 'Empréstimos' as Section, icon: Users, count: loans.length },
+    { label: 'Empréstimos' as Section, icon: Users, count: activeLoans.length },
     { label: 'Autores' as Section, icon: Bookmark, count: authors.length }
   ];
 
