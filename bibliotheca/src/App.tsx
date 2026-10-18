@@ -354,7 +354,7 @@ function App() {
       const url = 'https://www.googleapis.com/books/v1/volumes?q=isbn:' + encodeURIComponent(normalized) + '&maxResults=5';
       const res = await fetch(url);
       const raw = await res.text();
-      let data: { items?: { volumeInfo?: { title?: string; authors?: string[]; publisher?: string; publishedDate?: string; industryIdentifiers?: { type?: string; identifier?: string }[]; imageLinks?: { thumbnail?: string; smallThumbnail?: string } }[]; error?: { message?: string } };
+      let data: any;
       try { data = JSON.parse(raw); }
       catch { throw new Error('Resposta inválida do Google Books (HTTP ' + res.status + ').'); }
       if (!res.ok) throw new Error(data.error?.message || ('Google Books respondeu com HTTP ' + res.status + '.'));
