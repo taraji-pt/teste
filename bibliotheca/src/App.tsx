@@ -3,7 +3,7 @@ import {
   BookOpen, Search, Plus, LayoutGrid, List, LibraryBig, Tags, Bookmark,
   Users, ChevronDown, X, Cloud, CloudOff, Download,
   Upload, Pencil, Trash2, CircleCheck, Clock3, BookMarked, ArrowUpRight,
-  Menu, RotateCcw, Save
+  Menu, RotateCcw, Save, RefreshCw
 } from 'lucide-react';
 import type { Book, Loan, ReadingStatus } from './types';
 import { categories } from './data';
@@ -548,7 +548,7 @@ function App() {
         {userCategories.filter(category => books.some(book => book.category === category)).map((category, index) => <button key={category} className="nav-item collection-item" onClick={() => {setSection('Biblioteca');setCategoryFilter(category);setMobileMenu(false);}}><span className={`collection-dot ${['sage','ochre','blue'][index%3]}`}/><span>{category}</span><span className="nav-count">{books.filter(book => book.category === category).length}</span></button>)}
       </>}
       <div className="sidebar-bottom">
-        <button type="button" className="sync-card sync-card-button" onClick={() => void refreshAuthState()} title="Atualizar estado da conta e sincronização"><div className="sync-icon">{cloudConfigured?<Cloud size={18}/>:<CloudOff size={18}/>}</div><div className="sync-copy"><strong>{!cloudConfigured?'Nuvem indisponível':!cloudUser?'Sessão não iniciada':'Última sincronização'}</strong><small>{!cloudConfigured?'Verifica a configuração':!cloudUser?'Inicia sessão para sincronizar':formatSyncTime(lastSyncAt) || 'A aguardar sincronização'}</small></div></button>
+        <button type="button" className="sync-card sync-card-button" onClick={() => void refreshAuthState()} title="Atualizar estado da conta e sincronização"><div className="sync-icon">{cloudConfigured?<Cloud size={18}/>:<CloudOff size={18}/>}</div><div className="sync-copy"><strong>{!cloudConfigured?'Nuvem indisponível':!cloudUser?'Sessão não iniciada':'Última sincronização'}</strong><small>{!cloudConfigured?'Verifica a configuração':!cloudUser?'Inicia sessão para sincronizar':formatSyncTime(lastSyncAt) || 'A aguardar sincronização'}</small></div><RefreshCw className="sync-refresh-icon" size={15} aria-hidden="true"/></button>
         <button className="nav-item" onClick={exportData}><Download size={17}/>Exportar cópia</button>
         <button className="nav-item" onClick={() => fileRef.current?.click()}><Upload size={17}/>Importar cópia</button>
         <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={e=>{importData(e.target.files?.[0]);e.currentTarget.value='';}}/>
