@@ -1,33 +1,10 @@
+import { load } from "npm:cheerio@1.0.0";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
-
-function decodeHtml(value: string): string {
-  return value
-    .replace(/&amp;/g, "&")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;|&apos;/g, "'")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
-    .replace(/&#x([\da-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)))
-    .replace(/<[^>]*>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function field(html: string, label: string): string {
-  const paragraphs = html.match(/<p\b[^>]*>[\s\S]*?<\/p>/gi) ?? [];
-  const row = paragraphs.find((p) => {
-    const strong = p.match(/<strong\b[^>]*>([\s\S]*?)<\/strong>/i)?.[1] ?? "";
-    return decodeHtml(strong).replace(/:$/, "").toLowerCase() === label.toLowerCase();
-  });
-  if (!row) return "";
-  return decodeHtml(row.replace(/^[\s\S]*?<strong\b[^>]*>[\s\S]*?<\/strong>/i, "").replace(/^[\s:：-]+/, ""));
-}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -42,15 +19,17 @@ Deno.serve(async (req) => {
       return Response.json({ error: "Introduz um ISBN-10 ou ISBN-13 válido." }, { status: 400, headers: corsHeaders });
     }
 
-    const response = await fetch("https://isbnsearch.org/isbn/" + encodeURIComponent(isbn), {
+    const url = "https://isbnsearch.org/isbn/" + encodeURIComponent(isbn);
+    const response = await fetch(url, {
       headers: {
         "Accept": "text/html,application/xhtml+xml",
         "User-Agent": "Mozilla/5.0 (compatible; BibliothecaISBNLookup/1.0)",
       },
       redirect: "follow",
     });
+
     if (!response.ok) {
-      return Response.json({ error: `O ISBN Search respondeu com HTTP ${response.status}.` }, { status: 502, headers: corsHeaders });
+      return Response.json({ error: `O ISBN Search respondeu com HTTP ${response.status}.`, url }, { status: 502, headers: corsHeaders });
     }
 
     const html = await response.text();
@@ -58,24 +37,49 @@ Deno.serve(async (req) => {
       return Response.json({
         error: "O ISBN Search bloqueou a consulta automática com uma verificação anti-bot. Abre o ISBN Search no navegador e confirma os dados manualmente.",
         challenge: true,
-        url: "https://isbnsearch.org/isbn/" + isbn,
+        url,
       }, { status: 424, headers: corsHeaders });
     }
 
-    const bookBlock = html.match(/<div\b[^>]*id=["']book["'][^>]*>([\s\S]*?)<\/div>\s*<\/div>/i)?.[1] ?? html;
-    const title = decodeHtml(bookBlock.match(/<div\b[^>]*class=["'][^"']*bookinfo[^"']*["'][^>]*>[\s\S]*?<h1\b[^>]*>([\s\S]*?)<\/h1>/i)?.[1] ?? "");
+    // Parse HTML structurally so nested divs do not truncate the book record.
+    const $ = load(html);
+    const book = $("#book");
+    const info = book.find(".bookinfo").first();
+    const title = info.find("h1").first().text().trim();
+
     if (!title) {
-      return Response.json({ error: "O ISBN Search não encontrou este ISBN ou não devolveu uma ficha legível.", url: "https://isbnsearch.org/isbn/" + isbn }, { status: 404, headers: corsHeaders });
+      // Return only diagnostics, never the full upstream HTML.
+      const pageTitle = $("title").text().trim();
+      const hasBookContainer = book.length > 0;
+      return Response.json({
+        error: "O ISBN Search respondeu, mas não foi possível identificar a ficha do livro.",
+        url,
+        diagnostic: { pageTitle, hasBookContainer, responseUrl: response.url },
+      }, { status: 404, headers: corsHeaders });
     }
-    const info = bookBlock.match(/<div\b[^>]*class=["'][^"']*bookinfo[^"']*["'][^>]*>([\s\S]*?)<\/div>/i)?.[1] ?? bookBlock;
-    const coverPath = bookBlock.match(/<div\b[^>]*class=["'][^"']*image[^"']*["'][^>]*>[\s\S]*?<img\b[^>]*src=["']([^"']+)["']/i)?.[1] ?? "";
-    const cover = coverPath ? new URL(coverPath, "https://isbnsearch.org").href.replace(/^http:\/\//i, "https://") : "";
+
+    const readField = (label: string) => {
+      let value = "";
+      info.find("p").each((_index, element) => {
+        const row = $(element);
+        const name = row.find("strong").first().text().trim().replace(/:$/, "").toLowerCase();
+        if (name === label.toLowerCase()) {
+          value = row.clone().children("strong").remove().end().text().replace(/^\s*[:：-]?\s*/, "").trim();
+          return false;
+        }
+      });
+      return value;
+    };
+
+    const coverPath = book.find(".image img").first().attr("src") ?? "";
+    const cover = coverPath ? new URL(coverPath, url).href.replace(/^http:\/\//i, "https://") : "";
+    const authorText = readField("Author");
 
     return Response.json({
       title,
-      authors: field(info, "Author").split(/\s*;\s*|\s*,\s*(?=[A-ZÀ-Ý])/).map((s) => s.trim()).filter(Boolean),
-      publisher: field(info, "Publisher"),
-      year: field(info, "Published").match(/\d{4}/)?.[0] ?? "",
+      authors: authorText.split(/\s*;\s*|\s*,\s*(?=[A-ZÀ-Ý])/).map((name) => name.trim()).filter(Boolean),
+      publisher: readField("Publisher"),
+      year: readField("Published").match(/\d{4}/)?.[0] ?? "",
       isbn,
       cover,
       source: "ISBN Search",
