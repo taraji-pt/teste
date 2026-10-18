@@ -369,13 +369,48 @@ function App() {
     } finally { setBusyIsbn(false); }
   }
 
+  async function refreshAuthState() {
+    if (!supabase) {
+      setCloudUser(null);
+      setShowAuth(true);
+      return;
+    }
+    const { data, error } = await supabase.auth.getSession();
+    if (error) {
+      setToast('Não foi possível verificar a sessão. Tenta novamente.');
+      return;
+    }
+    const email = data.session?.user.email ?? null;
+    setCloudUser(email);
+    setShowAuth(true);
+    if (email) {
+      const { data: userData } = await supabase.auth.getUser();
+      setCloudUser(userData.user?.email ?? email);
+    }
+  }
+
   async function auth() {
     if (!supabase) return;
-    const result = cloudUser
-      ? await supabase.auth.signOut()
-      : await supabase.auth.signInWithPassword({ email: authEmail, password: authPassword });
-    if (result.error) setToast(result.error.message);
-    else { setCloudUser(null); setShowAuth(false); setToast(cloudUser ? 'Sessão terminada.' : 'Sessão iniciada.'); }
+    if (cloudUser) {
+      const result = await supabase.auth.signOut();
+      if (result.error) setToast(result.error.message);
+      else {
+        setCloudUser(null);
+        setShowAuth(false);
+        setToast('Sessão terminada.');
+      }
+      return;
+    }
+    const result = await supabase.auth.signInWithPassword({ email: authEmail, password: authPassword });
+    if (result.error) {
+      setToast(result.error.message);
+      return;
+    }
+    const { data } = await supabase.auth.getSession();
+    setCloudUser(data.session?.user.email ?? null);
+    setShowAuth(true);
+    setAuthPassword('');
+    setToast(data.session ? 'Sessão iniciada.' : 'Não foi possível confirmar a sessão.');
   }
   function exportData() {
     const blob = new Blob([JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), books, loans }, null, 2)], {type:'application/json'});
@@ -423,7 +458,7 @@ function App() {
 
   return <div className="app-shell">
     <aside className={`sidebar ${mobileMenu ? 'open' : ''}`}>
-      <div className="brand"><img className="brand-mark" src={`${import.meta.env.BASE_URL}bibliotheca-logo.svg`} alt="" /><div><strong>BiblioTTheca</strong><small>Gestão de biblioteca pessoal</small></div><button className="icon-btn close-menu" onClick={() => setMobileMenu(false)}><X size={18}/></button></div>
+      <div className="brand"><img className="brand-mark" src={`${import.meta.env.BASE_URL}bibliotheca-logo.png?v=2`} alt="" /><div><strong>BiblioTTheca</strong><small>Gestão de biblioteca pessoal</small></div><button className="icon-btn close-menu" onClick={() => setMobileMenu(false)}><X size={18}/></button></div>
       <div className="side-label">A MINHA COLEÇÃO</div>
       <nav>{navItems.map(item => <button key={item.label} className={`nav-item ${section===item.label?'active':''}`} onClick={() => {setSection(item.label);setMobileMenu(false);}}><item.icon size={18}/><span>{item.label}</span>{item.label==='Biblioteca'&&<span className="nav-count">{books.length}</span>}</button>)}</nav>
       <div className="side-label section-label">COLEÇÕES</div>
@@ -431,7 +466,7 @@ function App() {
       <button className="nav-item" onClick={() => {setSection('Biblioteca');setCategoryFilter('Comentários bíblicos');}}><span className="collection-dot ochre"/>Comentários bíblicos</button>
       <button className="nav-item" onClick={() => {setSection('Biblioteca');setCategoryFilter('Tradição baptista');}}><span className="collection-dot blue"/>Tradição baptista</button>
       <div className="sidebar-bottom">
-        <div className="sync-card"><div className="sync-icon">{cloudConfigured?<Cloud size={18}/>:<CloudOff size={18}/>}</div><div className="sync-copy"><strong>{!cloudConfigured?'Nuvem indisponível':!cloudUser?'Sessão não iniciada':'Última sincronização'}</strong><small>{!cloudConfigured?'Verifica a configuração':!cloudUser?'Inicia sessão para sincronizar':formatSyncTime(lastSyncAt) || 'A aguardar sincronização'}</small></div></div>
+        <button type="button" className="sync-card sync-card-button" onClick={() => void refreshAuthState()} title="Atualizar estado da conta e sincronização"><div className="sync-icon">{cloudConfigured?<Cloud size={18}/>:<CloudOff size={18}/>}</div><div className="sync-copy"><strong>{!cloudConfigured?'Nuvem indisponível':!cloudUser?'Sessão não iniciada':'Última sincronização'}</strong><small>{!cloudConfigured?'Verifica a configuração':!cloudUser?'Inicia sessão para sincronizar':formatSyncTime(lastSyncAt) || 'A aguardar sincronização'}</small></div></button>
         <button className="nav-item" onClick={exportData}><Download size={17}/>Exportar cópia</button>
         <button className="nav-item" onClick={() => fileRef.current?.click()}><Upload size={17}/>Importar cópia</button>
         <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={e=>{importData(e.target.files?.[0]);e.currentTarget.value='';}}/>
@@ -442,7 +477,7 @@ function App() {
       <header className="topbar">
         <button className="icon-btn mobile-menu-btn" onClick={() => setMobileMenu(true)}><Menu size={20}/></button>
         <div className="breadcrumbs"><span>BiblioTTheca</span><span className="crumb-slash">/</span><strong>{section}</strong></div>
-        <div className="top-actions"><span className={`cloud-status ${cloudConfigured?'ready':''}`}><span className="status-dot"/>{cloudConfigured?'Nuvem configurável':'Só neste dispositivo'}</span><button className="avatar" onClick={() => setShowAuth(v=>!v)} title="Conta">TT</button></div>
+        <div className="top-actions"><span className={`cloud-status ${cloudConfigured?'ready':''}`}><span className="status-dot"/>{cloudConfigured?'Nuvem configurável':'Só neste dispositivo'}</span><button className="avatar" onClick={() => void refreshAuthState()} title="Atualizar conta">TT</button></div>
       </header>
       {showAuth && <div className="auth-panel">
         <div className="auth-head"><div><strong>Sincronização privada</strong><small>{!cloudConfigured?'Configuração Supabase necessária.':cloudUser?`Sessão iniciada como ${cloudUser}.`:'Liga-te à tua conta para sincronizar.'}</small></div><button className="icon-btn" onClick={()=>setShowAuth(false)}><X size={17}/></button></div>
