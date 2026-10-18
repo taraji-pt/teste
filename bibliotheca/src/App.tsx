@@ -347,29 +347,39 @@ function App() {
   ];
 
   async function lookupIsbn(isbn: string, target?: Book) {
-    const normalized = isbn.replace(/[^0-9Xx]/g, '');
+    const normalized = isbn.replace(/[^0-9Xx]/g, '').toUpperCase();
     if (!normalized) { setToast('Introduz um ISBN válido.'); return; }
     setBusyIsbn(true);
     try {
-      const res = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${encodeURIComponent(normalized)}&format=json&jscmd=data`);
+      const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${encodeURIComponent(normalized)}&maxResults=5`);
       if (!res.ok) throw new Error('Falha na consulta bibliográfica');
       const data = await res.json();
-      const item = data[`ISBN:${normalized}`];
-      if (!item) { setToast('Não encontrámos metadados para este ISBN. Podes preencher a ficha manualmente.'); return; }
+      const items = Array.isArray(data.items) ? data.items : [];
+      const item = items.find((entry: { volumeInfo?: { industryIdentifiers?: { type?: string; identifier?: string }[] } }) =>
+        entry.volumeInfo?.industryIdentifiers?.some(identifier =>
+          identifier.identifier?.replace(/[^0-9Xx]/g, '').toUpperCase() === normalized
+        )
+      ) ?? items[0];
+      const info = item?.volumeInfo;
+      if (!info) {
+        setToast('O Google Books não encontrou metadados para este ISBN. Podes preencher a ficha manualmente.');
+        return;
+      }
       const next = target ?? editor ?? emptyBook();
+      const coverUrl = info.imageLinks?.thumbnail || info.imageLinks?.smallThumbnail || '';
       const updated: Book = {
         ...next,
-        title: item.title || next.title,
-        authors: item.authors?.map((a: {name:string}) => a.name) ?? next.authors,
-        publisher: item.publishers?.[0]?.name ?? next.publisher,
-        year: item.publish_date?.match(/\d{4}/)?.[0] ?? next.year,
+        title: info.title || next.title,
+        authors: Array.isArray(info.authors) && info.authors.length ? info.authors : next.authors,
+        publisher: info.publisher || next.publisher,
+        year: info.publishedDate?.match(/\\d{4}/)?.[0] ?? next.year,
         isbn: normalized,
-        cover: item.cover?.large || item.cover?.medium || item.cover?.small || next.cover
+        cover: coverUrl ? coverUrl.replace(/^http:\\/\\//i, 'https://').replace(/&amp;/g, '&') : next.cover
       };
       setEditor(updated);
-      setToast('Metadados encontrados. Confirma os dados antes de guardar.');
+      setToast('Metadados encontrados no Google Books. Confirma os dados antes de guardar.');
     } catch {
-      setToast('Não foi possível consultar o catálogo. Verifica a ligação à internet.');
+      setToast('Não foi possível consultar o Google Books. Verifica a ligação à internet.');
     } finally { setBusyIsbn(false); }
   }
 
