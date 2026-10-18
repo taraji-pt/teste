@@ -213,7 +213,7 @@ function App() {
   }, [books, loans, cloudUser]);
   // Realtime provides fast updates when available; polling/focus refresh is a fallback.
   useEffect(() => {
-    if (!supabase || !cloudUser || !syncReadyRef.current) return;
+    if (!supabase || !cloudUser) return;
     let stopped = false;
     let refreshing = false;
 
@@ -223,7 +223,7 @@ function App() {
     };
 
     const refreshFromCloud = async () => {
-      if (stopped || refreshing || document.visibilityState === 'hidden') return;
+      if (stopped || !syncReadyRef.current || refreshing || document.visibilityState === 'hidden') return;
       refreshing = true;
       try {
         const { data: userData } = await supabase!.auth.getUser();
