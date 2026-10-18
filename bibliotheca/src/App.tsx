@@ -46,6 +46,7 @@ function App() {
   const [mobileMenu, setMobileMenu] = useState(false);
   const [cloudUser, setCloudUser] = useState<string | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [showAuth, setShowAuth] = useState(false);
@@ -476,15 +477,20 @@ function App() {
         <div><Clock3/><span><strong>Empréstimos</strong><small>Acompanha os livros emprestados</small></span></div>
         <div><Cloud/><span><strong>Sincronização na nuvem</strong><small>Acesso entre os teus dispositivos</small></span></div>
       </div>
-      <form className="login-form" onSubmit={e=>{e.preventDefault();void auth();}}>
-        <div className="login-form-title">Entra na tua biblioteca</div>
-        {!cloudConfigured ? <p className="login-config-note">A autenticação ainda não está configurada. Verifica as definições do Supabase.</p> : <>
-          <label>Email<input className="field" type="email" autoComplete="username" placeholder="nome@exemplo.com" value={authEmail} onChange={e=>setAuthEmail(e.target.value)} required /></label>
-          <label>Palavra-passe<input className="field" type="password" autoComplete="current-password" placeholder="A tua palavra-passe" value={authPassword} onChange={e=>setAuthPassword(e.target.value)} required /></label>
-          <button className="login-submit" type="submit"><Users size={17}/>Iniciar sessão<ArrowUpRight size={17}/></button>
-        </>}
-        <p className="login-private"><Cloud size={14}/> A tua coleção é privada e sincronizada em segurança.</p>
-      </form>
+      <div className="login-cta">
+        <button className="login-submit" type="button" onClick={() => setLoginModalOpen(true)}><Users size={17}/>Iniciar sessão<ArrowUpRight size={17}/></button>
+      </div>
+      {loginModalOpen && <div className="login-modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setLoginModalOpen(false);}}>
+        <form className="login-modal" onSubmit={e=>{e.preventDefault();void auth();}}>
+          <div className="login-modal-heading"><div><div className="login-form-title">Entra na tua biblioteca</div><p>Inicia sessão para aceder à tua coleção.</p></div><button type="button" className="login-modal-close" aria-label="Fechar" onClick={()=>setLoginModalOpen(false)}><X size={19}/></button></div>
+          {!cloudConfigured ? <p className="login-config-note">A autenticação ainda não está configurada. Verifica as definições do Supabase.</p> : <>
+            <label>Email<input className="field" type="email" autoComplete="username" placeholder="nome@exemplo.com" value={authEmail} onChange={e=>setAuthEmail(e.target.value)} required /></label>
+            <label>Palavra-passe<input className="field" type="password" autoComplete="current-password" placeholder="A tua palavra-passe" value={authPassword} onChange={e=>setAuthPassword(e.target.value)} required /></label>
+            <button className="login-submit" type="submit"><Users size={17}/>Iniciar sessão<ArrowUpRight size={17}/></button>
+          </>}
+          <p className="login-private"><Cloud size={14}/> A tua coleção é privada e sincronizada em segurança.</p>
+        </form>
+      </div>}
       <footer className="login-footer">© Tiago Terraquente, 2026</footer>
     </section>
     <section className="login-visual" aria-label="Interior de uma biblioteca">
