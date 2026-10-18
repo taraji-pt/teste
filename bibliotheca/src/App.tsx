@@ -573,7 +573,7 @@ function BookModal({book,categories,onClose,onSave,onChange}:{book:Book;categori
       <label className="span-2">Categoria<select className="field" value={book.category} onChange={e=>set('category',e.target.value)}>{categories.map(c=><option key={c}>{c}</option>)}</select></label>
       <label className="span-2">URL da capa<input className="field" type="url" value={book.cover} onChange={e=>set('cover',e.target.value)} placeholder="https://…"/></label>
     </div>
-    <div className="modal-footer"><button className="btn secondary" onClick={onClose}>Cancelar</button><button className="btn primary" onClick={onSave}><Save size={16}/>Guardar livro</button></div>
+    <div className="modal-footer book-modal-footer"><a className="isbnsearch-link" href="https://isbnsearch.org/" target="_blank" rel="noopener noreferrer">Pesquisar no ISBN Search <ArrowUpRight size={14}/></a><div className="book-modal-actions"><button className="btn secondary" onClick={onClose}>Cancelar</button><button className="btn primary" onClick={onSave}><Save size={16}/>Guardar livro</button></div></div>
   </div></div>;
 }
 function LoanModal({book,onClose,onSave}:{book:Book;onClose:()=>void;onSave:(book:Book,borrower:string,dueAt:string,notes:string)=>void}) {
