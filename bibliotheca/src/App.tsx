@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   BookOpen, Search, Plus, LayoutGrid, List, LibraryBig, Tags, Bookmark,
-  Users, Settings, ChevronDown, X, ScanBarcode, Cloud, CloudOff, Download,
+  Users, ChevronDown, X, ScanBarcode, Cloud, CloudOff, Download,
   Upload, Pencil, Trash2, MapPin, CircleCheck, Clock3, BookMarked, ArrowUpRight,
   Star, Menu, RotateCcw, Save
 } from 'lucide-react';
@@ -423,7 +423,7 @@ function App() {
 
   return <div className="app-shell">
     <aside className={`sidebar ${mobileMenu ? 'open' : ''}`}>
-      <div className="brand"><div className="brand-mark"><BookOpen size={22}/></div><div><strong>BiblioTTheca</strong><small>Gestão de biblioteca pessoal</small></div><button className="icon-btn close-menu" onClick={() => setMobileMenu(false)}><X size={18}/></button></div>
+      <div className="brand"><img className="brand-mark" src={`${import.meta.env.BASE_URL}bibliotheca-logo.svg`} alt="" /><div><strong>BiblioTTheca</strong><small>Gestão de biblioteca pessoal</small></div><button className="icon-btn close-menu" onClick={() => setMobileMenu(false)}><X size={18}/></button></div>
       <div className="side-label">A MINHA COLEÇÃO</div>
       <nav>{navItems.map(item => <button key={item.label} className={`nav-item ${section===item.label?'active':''}`} onClick={() => {setSection(item.label);setMobileMenu(false);}}><item.icon size={18}/><span>{item.label}</span>{item.label==='Biblioteca'&&<span className="nav-count">{books.length}</span>}</button>)}</nav>
       <div className="side-label section-label">COLEÇÕES</div>
@@ -431,7 +431,7 @@ function App() {
       <button className="nav-item" onClick={() => {setSection('Biblioteca');setCategoryFilter('Comentários bíblicos');}}><span className="collection-dot ochre"/>Comentários bíblicos</button>
       <button className="nav-item" onClick={() => {setSection('Biblioteca');setCategoryFilter('Tradição baptista');}}><span className="collection-dot blue"/>Tradição baptista</button>
       <div className="sidebar-bottom">
-        <div className="sync-card"><div className="sync-icon">{cloudConfigured?<Cloud size={18}/>:<CloudOff size={18}/>}</div><div className="sync-copy"><strong>{!cloudConfigured?'Nuvem indisponível':!cloudUser?'Sessão não iniciada':'Última sincronização'}</strong><small>{!cloudConfigured?'Verifica a configuração':!cloudUser?'Inicia sessão para sincronizar':formatSyncTime(lastSyncAt) || 'A aguardar sincronização'}</small></div><button className="tiny-icon" title="Conta e sincronização" onClick={() => setShowAuth(v=>!v)}><Settings size={15}/></button></div>
+        <div className="sync-card"><div className="sync-icon">{cloudConfigured?<Cloud size={18}/>:<CloudOff size={18}/>}</div><div className="sync-copy"><strong>{!cloudConfigured?'Nuvem indisponível':!cloudUser?'Sessão não iniciada':'Última sincronização'}</strong><small>{!cloudConfigured?'Verifica a configuração':!cloudUser?'Inicia sessão para sincronizar':formatSyncTime(lastSyncAt) || 'A aguardar sincronização'}</small></div></div>
         <button className="nav-item" onClick={exportData}><Download size={17}/>Exportar cópia</button>
         <button className="nav-item" onClick={() => fileRef.current?.click()}><Upload size={17}/>Importar cópia</button>
         <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={e=>{importData(e.target.files?.[0]);e.currentTarget.value='';}}/>
@@ -445,7 +445,7 @@ function App() {
         <div className="top-actions"><span className={`cloud-status ${cloudConfigured?'ready':''}`}><span className="status-dot"/>{cloudConfigured?'Nuvem configurável':'Só neste dispositivo'}</span><button className="avatar" onClick={() => setShowAuth(v=>!v)} title="Conta">TT</button></div>
       </header>
       {showAuth && <div className="auth-panel">
-        <div className="auth-head"><div><strong>Sincronização privada</strong><small>{cloudConfigured?'Liga-te à tua conta para sincronizar.':'Configuração Supabase necessária.'}</small></div><button className="icon-btn" onClick={()=>setShowAuth(false)}><X size={17}/></button></div>
+        <div className="auth-head"><div><strong>Sincronização privada</strong><small>{!cloudConfigured?'Configuração Supabase necessária.':cloudUser?`Sessão iniciada como ${cloudUser}.`:'Liga-te à tua conta para sincronizar.'}</small></div><button className="icon-btn" onClick={()=>setShowAuth(false)}><X size={17}/></button></div>
         {!cloudConfigured ? <p className="muted small">Cria um projeto Supabase, configura as variáveis VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY e executa o ficheiro <code>supabase/schema.sql</code>.</p> : <>
           {!cloudUser && <><input className="field" placeholder="Email" value={authEmail} onChange={e=>setAuthEmail(e.target.value)}/><input className="field" placeholder="Palavra-passe" type="password" value={authPassword} onChange={e=>setAuthPassword(e.target.value)}/></>}
           <div className="button-row"><button className="btn secondary" onClick={auth}>{cloudUser?'Terminar sessão':'Iniciar sessão'}</button></div>{cloudUser&&<p className="muted small">Sessão ativa. Os livros e empréstimos são sincronizados automaticamente entre os teus dispositivos.</p>}
