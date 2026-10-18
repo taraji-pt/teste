@@ -351,24 +351,17 @@ function App() {
     if (!normalized) { setToast('Introduz um ISBN válido.'); return; }
     setBusyIsbn(true);
     try {
-      const url = \`https://www.googleapis.com/books/v1/volumes?q=isbn:\${encodeURIComponent(normalized)}&maxResults=5\`;
+      const url = 'https://www.googleapis.com/books/v1/volumes?q=isbn:' + encodeURIComponent(normalized) + '&maxResults=5';
       const res = await fetch(url);
       const raw = await res.text();
       let data: { items?: { volumeInfo?: { title?: string; authors?: string[]; publisher?: string; publishedDate?: string; industryIdentifiers?: { type?: string; identifier?: string }[]; imageLinks?: { thumbnail?: string; smallThumbnail?: string } }[]; error?: { message?: string } };
-      try {
-        data = JSON.parse(raw);
-      } catch {
-        throw new Error(\`Resposta inválida do Google Books (HTTP \${res.status}).\`);
-      }
-      if (!res.ok) {
-        throw new Error(data.error?.message || \`Google Books respondeu com HTTP \${res.status}.\`);
-      }
+      try { data = JSON.parse(raw); }
+      catch { throw new Error('Resposta inválida do Google Books (HTTP ' + res.status + ').'); }
+      if (!res.ok) throw new Error(data.error?.message || ('Google Books respondeu com HTTP ' + res.status + '.'));
       const items = Array.isArray(data.items) ? data.items : [];
-      const item = items.find(entry =>
-        entry.volumeInfo?.industryIdentifiers?.some(identifier =>
-          identifier.identifier?.replace(/[^0-9Xx]/g, '').toUpperCase() === normalized
-        )
-      ) ?? items[0];
+      const item = items.find(entry => entry.volumeInfo?.industryIdentifiers?.some(identifier =>
+        identifier.identifier?.replace(/[^0-9Xx]/g, '').toUpperCase() === normalized
+      )) ?? items[0];
       const info = item?.volumeInfo;
       if (!info) {
         setToast('O Google Books não encontrou este ISBN. Podes preencher a ficha manualmente.');
@@ -389,7 +382,7 @@ function App() {
       setToast('Metadados encontrados no Google Books. Confirma os dados antes de guardar.');
     } catch (error) {
       const detail = error instanceof Error ? error.message : 'erro desconhecido';
-      setToast(\`Erro ao consultar Google Books: \${detail}\`);
+      setToast('Erro ao consultar Google Books: ' + detail);
     } finally { setBusyIsbn(false); }
   }
 
