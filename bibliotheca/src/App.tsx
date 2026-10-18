@@ -36,7 +36,6 @@ function App() {
   const [categoryFilter, setCategoryFilter] = useState('Todas as categorias');
   const [userCategories, setUserCategories] = useState<string[]>(categories);
   const [newCategoryName, setNewCategoryName] = useState('');
-  const [statusFilter, setStatusFilter] = useState('Todos os estados');
   const [view, setView] = useState<'grid'|'list'>('grid');
   const [editor, setEditor] = useState<Book | null>(null);
   const [loanEditor, setLoanEditor] = useState<Book | null>(null);
@@ -308,9 +307,8 @@ function App() {
   const filtered = useMemo(() => books.filter(b => {
     const haystack = [b.title, ...b.authors, b.isbn, b.publisher, b.category, ...b.tags, b.shelf].join(' ').toLocaleLowerCase('pt-PT');
     return haystack.includes(query.toLocaleLowerCase('pt-PT')) &&
-      (categoryFilter === 'Todas as categorias' || b.category === categoryFilter) &&
-      (statusFilter === 'Todos os estados' || b.status === statusFilter);
-  }).sort((a,b) => a.title.localeCompare(b.title, 'pt-PT')), [books, query, categoryFilter, statusFilter]);
+      (categoryFilter === 'Todas as categorias' || b.category === categoryFilter);
+  }).sort((a,b) => a.title.localeCompare(b.title, 'pt-PT')), [books, query, categoryFilter]);
 
   const activeLoans = loans.filter(l => !l.returnedAt);
   const authors = [...new Set(books.flatMap(b => b.authors).filter(Boolean))].sort((a,b) => a.localeCompare(b, 'pt-PT'));
@@ -537,8 +535,8 @@ function App() {
         {section==='Biblioteca' && <>
           <div className="page-heading"><div><div className="eyebrow">A TUA COLEÇÃO PRIVADA</div><h1>Uma biblioteca de <em>sabedoria.</em></h1><p className="subtitle">Toda a tua leitura, organizada num só lugar.</p></div><button className="btn primary add-main" onClick={()=>setEditor({...emptyBook(), category: userCategories[0] ?? ''})}><Plus size={17}/>Adicionar livro</button></div>
           <div className="stats-grid">{stats.map(s=><div className="stat-card" key={s.label}><div className="stat-top"><span>{s.label}</span><s.icon size={17}/></div><div className="stat-number">{s.value}</div></div>)}</div>
-          <div className="toolbar"><div className="search-box"><Search size={17}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Pesquisar título ou autor..."/>{query&&<button onClick={()=>setQuery('')}><X size={15}/></button>}<kbd>⌘ K</kbd></div><div className="toolbar-actions"><select value={categoryFilter} onChange={e=>setCategoryFilter(e.target.value)}><option>Todas as categorias</option>{userCategories.map(c=><option key={c}>{c}</option>)}</select><select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)}><option>Todos os estados</option>{(['Por ler','A ler','Lido','Consulta'] as ReadingStatus[]).map(s=><option key={s}>{s}</option>)}</select><div className="view-switch"><button className={view==='grid'?'selected':''} onClick={()=>setView('grid')} title="Grelha"><LayoutGrid size={17}/></button><button className={view==='list'?'selected':''} onClick={()=>setView('list')} title="Lista"><List size={17}/></button></div></div></div>
-          <div className="results-line"><span>{filtered.length} {filtered.length===1?'livro':'livros'} encontrados</span><button className="text-action" onClick={()=>{setQuery('');setCategoryFilter('Todas as categorias');setStatusFilter('Todos os estados');}}>Limpar filtros <RotateCcw size={13}/></button></div>
+          <div className="toolbar"><div className="search-box"><Search size={17}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Pesquisar título ou autor..."/>{query&&<button onClick={()=>setQuery('')}><X size={15}/></button>}<kbd>⌘ K</kbd></div><div className="toolbar-actions"><select value={categoryFilter} onChange={e=>setCategoryFilter(e.target.value)}><option>Todas as categorias</option>{userCategories.map(c=><option key={c}>{c}</option>)}</select><div className="view-switch"><button className={view==='grid'?'selected':''} onClick={()=>setView('grid')} title="Grelha"><LayoutGrid size={17}/></button><button className={view==='list'?'selected':''} onClick={()=>setView('list')} title="Lista"><List size={17}/></button></div></div></div>
+          <div className="results-line"><span>{filtered.length} {filtered.length===1?'livro':'livros'} encontrados</span><button className="text-action" onClick={()=>{setQuery('');setCategoryFilter('Todas as categorias');}}>Limpar filtros <RotateCcw size={13}/></button></div>
           {filtered.length===0 ? <div className="empty-state"><BookOpen size={32}/><h3>Nenhum livro encontrado</h3><p>Experimenta alterar a pesquisa ou adiciona um livro à tua coleção.</p><button className="btn primary" onClick={()=>setEditor({...emptyBook(), category: userCategories[0] ?? ''})}><Plus size={16}/>Adicionar primeiro livro</button></div> :
           <div className={view==='grid'?'book-grid':'book-list'}>{filtered.map(book=><BookCard key={book.id} book={book} view={view} onEdit={()=>setEditor({...book})} onDelete={()=>deleteBook(book)} onLoan={()=>setLoanEditor(book)}/>)}</div>}
         </>}
