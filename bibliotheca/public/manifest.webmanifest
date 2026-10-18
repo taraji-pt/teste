@@ -1,7 +1,7 @@
 {
-  "name": "Bibliotheca — Biblioteca Teológica",
-  "short_name": "Bibliotheca",
-  "description": "Biblioteca cristã pessoal e privada",
+  "name": "BiblioTTheca — Gestão de Biblioteca Pessoal",
+  "short_name": "BiblioTTheca",
+  "description": "Gestão de biblioteca pessoal",
   "start_url": "/teste/bibliotheca/",
   "display": "standalone",
   "background_color": "#f5f3ed",
