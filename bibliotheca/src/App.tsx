@@ -531,7 +531,7 @@ function App() {
         <div className="auth-head"><div><strong>Sincronização privada</strong><small>{!cloudConfigured?'Configuração Supabase necessária.':cloudUser?`Sessão iniciada como ${cloudUser}.`:'Liga-te à tua conta para sincronizar.'}</small></div><button className="icon-btn" onClick={()=>setShowAuth(false)}><X size={17}/></button></div>
         {!cloudConfigured ? <p className="muted small">Cria um projeto Supabase, configura as variáveis VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY e executa o ficheiro <code>supabase/schema.sql</code>.</p> : <>
           {!cloudUser && <><input className="field" placeholder="Email" value={authEmail} onChange={e=>setAuthEmail(e.target.value)}/><input className="field" placeholder="Palavra-passe" type="password" value={authPassword} onChange={e=>setAuthPassword(e.target.value)}/></>}
-          <div className="button-row"><button className="btn secondary" onClick={auth}>{cloudUser?'Terminar sessão':'Iniciar sessão'}</button></div>{cloudUser&&<p className="muted small">Sessão ativa. Os livros e empréstimos são sincronizados automaticamente entre os teus dispositivos.</p>}
+          <div className="button-row"><button className={cloudUser ? "btn logout-glow" : "btn secondary"} onClick={auth}>{cloudUser?'Terminar sessão':'Iniciar sessão'}</button></div>{cloudUser&&<p className="muted small">Sessão ativa. Os livros e empréstimos são sincronizados automaticamente entre os teus dispositivos.</p>}
         </>}
       </div>}
       <div className="content">
