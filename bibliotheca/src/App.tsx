@@ -374,7 +374,7 @@ function App() {
         publisher: info.publisher || next.publisher,
         year: info.publishedDate?.match(/\\d{4}/)?.[0] ?? next.year,
         isbn: normalized,
-        cover: coverUrl ? coverUrl.replace(/^http:\\/\\//i, 'https://').replace(/&amp;/g, '&') : next.cover
+        cover: coverUrl ? coverUrl.replace(/^http:\/\//i, 'https://').replace(/&amp;/g, '&') : next.cover
       };
       setEditor(updated);
       setToast('Metadados encontrados no Google Books. Confirma os dados antes de guardar.');
