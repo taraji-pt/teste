@@ -72,3 +72,16 @@
 .login-modal .login-private{margin-top:17px}
 @keyframes login-modal-in{from{opacity:0;transform:translateY(8px) scale(.99)}to{opacity:1;transform:translateY(0) scale(1)}}
 @media(max-width:680px){.login-cta{padding-top:18px}.login-modal{padding:22px;border-radius:16px}.login-modal-backdrop{padding:16px}}
+
+
+/* User-managed categories and concise book details */
+.category-create{display:flex;gap:10px;max-width:620px;margin:0 0 20px}
+.category-create .field{flex:1}
+.category-card{min-width:0;gap:8px}
+.category-open{display:flex;align-items:center;gap:12px;flex:1;min-width:0;border:0;background:transparent;padding:0;text-align:left}
+.category-open>svg{flex-shrink:0;color:#a0a295}
+.category-delete{width:32px;height:32px;flex-shrink:0;display:grid;place-items:center;border:1px solid transparent;border-radius:6px;background:transparent;color:#9b877e}
+.category-delete:hover{border-color:#ead3cd;background:#f6e8e3;color:#a64f42}
+.book-extra{font-size:9px;color:#898f83;line-height:1.5;margin-top:7px;overflow-wrap:anywhere}
+.collection-item>span:nth-child(2){flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:600px){.category-create{flex-direction:column}.category-create .btn{width:100%}}
