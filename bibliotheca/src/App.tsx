@@ -351,18 +351,27 @@ function App() {
     if (!normalized) { setToast('Introduz um ISBN válido.'); return; }
     setBusyIsbn(true);
     try {
-      const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${encodeURIComponent(normalized)}&maxResults=5`);
-      if (!res.ok) throw new Error('Falha na consulta bibliográfica');
-      const data = await res.json();
+      const url = \`https://www.googleapis.com/books/v1/volumes?q=isbn:\${encodeURIComponent(normalized)}&maxResults=5\`;
+      const res = await fetch(url);
+      const raw = await res.text();
+      let data: { items?: { volumeInfo?: { title?: string; authors?: string[]; publisher?: string; publishedDate?: string; industryIdentifiers?: { type?: string; identifier?: string }[]; imageLinks?: { thumbnail?: string; smallThumbnail?: string } }[]; error?: { message?: string } };
+      try {
+        data = JSON.parse(raw);
+      } catch {
+        throw new Error(\`Resposta inválida do Google Books (HTTP \${res.status}).\`);
+      }
+      if (!res.ok) {
+        throw new Error(data.error?.message || \`Google Books respondeu com HTTP \${res.status}.\`);
+      }
       const items = Array.isArray(data.items) ? data.items : [];
-      const item = items.find((entry: { volumeInfo?: { industryIdentifiers?: { type?: string; identifier?: string }[] } }) =>
+      const item = items.find(entry =>
         entry.volumeInfo?.industryIdentifiers?.some(identifier =>
           identifier.identifier?.replace(/[^0-9Xx]/g, '').toUpperCase() === normalized
         )
       ) ?? items[0];
       const info = item?.volumeInfo;
       if (!info) {
-        setToast('O Google Books não encontrou metadados para este ISBN. Podes preencher a ficha manualmente.');
+        setToast('O Google Books não encontrou este ISBN. Podes preencher a ficha manualmente.');
         return;
       }
       const next = target ?? editor ?? emptyBook();
@@ -372,14 +381,15 @@ function App() {
         title: info.title || next.title,
         authors: Array.isArray(info.authors) && info.authors.length ? info.authors : next.authors,
         publisher: info.publisher || next.publisher,
-        year: info.publishedDate?.match(/\\d{4}/)?.[0] ?? next.year,
+        year: info.publishedDate?.match(/\d{4}/)?.[0] ?? next.year,
         isbn: normalized,
         cover: coverUrl ? coverUrl.replace(/^http:\/\//i, 'https://').replace(/&amp;/g, '&') : next.cover
       };
       setEditor(updated);
       setToast('Metadados encontrados no Google Books. Confirma os dados antes de guardar.');
-    } catch {
-      setToast('Não foi possível consultar o Google Books. Verifica a ligação à internet.');
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : 'erro desconhecido';
+      setToast(\`Erro ao consultar Google Books: \${detail}\`);
     } finally { setBusyIsbn(false); }
   }
 
